@@ -232,32 +232,34 @@ Place Order on WhatsApp
 }
 
 function checkout(){
-const id="AM"+Date.now();
-localStorage.setItem("order_"+id,JSON.stringify(cart));
+const id = "AM" + Date.now();
 
-let msg="Hello Agrima Mart 👋%0A%0A🧾 Order Details%0A";
-let total=0;
+/* freeze cart snapshot */
+localStorage.setItem("order_" + id, JSON.stringify(cart));
+
+let msg = "Hello Agrima Mart 👋%0A%0A🧾 Order Details%0A";
+let total = 0;
 
 for(let n in cart){
-let p=products.find(x=>x.name===n);
-let t=p.price*cart[n];
-total+=t;
-msg+=`• ${n} x ${cart[n]} = ₹${t}%0A`;
+  let p = products.find(x => x.name === n);
+  let t = p.price * cart[n];
+  total += t;
+  msg += `• ${n} x ${cart[n]} = ₹${t}%0A`;
 }
 
-/* ✅ FINAL CART SNAPSHOT LINK */
-const link = `${location.origin}${location.pathname}?order=${id}`;
+/* ✅ FINAL CART LINK (THIS WAS MISSING) */
+const cartLink = `${location.origin}${location.pathname}?order=${id}`;
 
-msg+=`%0A💰 Total: ₹${total}%0A`;
-msg+=`%0A📦 View Final Cart:%0A${link}`;
+msg += `%0A💰 Total: ₹${total}%0A`;
+msg += `%0A📦 View Final Cart:%0A${cartLink}`;
 
-window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
+window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
 
-/* clear live cart after placing order */
-cart={};
+/* clear live cart */
+cart = {};
 localStorage.removeItem("cart");
 updateCount();
-cartModal.style.display="none";
+cartModal.style.display = "none";
 }
 
 function checkFrozenOrder(){
