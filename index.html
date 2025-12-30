@@ -112,37 +112,37 @@ const installBtn=document.getElementById("installBtn");
 let products=[];
 let cart={};
 let currentCat="All Products";
-let frozenOrderId = new URLSearchParams(location.search).get("order");
 
-// Fetch products
+/* ---------- LOAD PRODUCTS ---------- */
 fetch(sheetURL).then(r=>r.json()).then(d=>{
-  products=d.map(p=>({
-    name:p.name,
-    cat:p.category,
-    price:+p.offer||+p.mrp,
-    mrp:+p.mrp,
-    desc:p.description,
-    imgs:p.images.split("|")
-  }));
-
-  renderCategories();
-
-  // If frozen order exists
-  if(frozenOrderId){
-    const data = localStorage.getItem("order_"+frozenOrderId);
-    if(data){
-      cart = JSON.parse(data);
-      setTimeout(openCart, 100); // open frozen cart
-      updateCount();
-      return; // Skip home page render
-    }
-  }
-
-  // Normal home page render
-  cart = JSON.parse(localStorage.getItem("cart"))||{};
-  renderProducts();
+products=d.map(p=>({
+name:p.name,
+cat:p.category,
+price:+p.offer||+p.mrp,
+mrp:+p.mrp,
+desc:p.description,
+imgs:p.images.split("|")
+}));
+renderCategories();
+loadCartFromLink();
 });
 
+/* ---------- UNIVERSAL CART FROM LINK ---------- */
+function loadCartFromLink(){
+const param=new URLSearchParams(location.search).get("order");
+if(param){
+try{
+cart=JSON.parse(atob(param));
+updateCount();
+openCart();
+return;
+}catch(e){}
+}
+cart=JSON.parse(localStorage.getItem("cart"))||{};
+renderProducts();
+}
+
+/* ---------- UI ---------- */
 search.oninput=renderProducts;
 
 function renderCategories(){
@@ -197,6 +197,7 @@ modal.style.display="block";
 history.pushState({},"","#product");
 }
 
+/* ---------- CART ---------- */
 function updateCart(name,val,refresh){
 cart[name]=(cart[name]||0)+val;
 if(cart[name]<=0) delete cart[name];
@@ -248,10 +249,9 @@ Place Order on WhatsApp
 </div>`;
 }
 
+/* ---------- CHECKOUT ---------- */
 function checkout(){
-const id="AM"+Date.now();
-localStorage.setItem("order_"+id,JSON.stringify(cart));
-
+const encoded=btoa(JSON.stringify(cart));
 let msg="Hello Agrima Mart 👋%0A%0A🧾 Order Details%0A";
 let total=0;
 for(let n in cart){
@@ -259,9 +259,8 @@ let p=products.find(x=>x.name===n);
 let t=p.price*cart[n]; total+=t;
 msg+=`• ${n} x ${cart[n]} = ₹${t}%0A`;
 }
-const link=`${location.origin}${location.pathname}?order=${id}`;
+const link=`${location.origin}${location.pathname}?order=${encoded}`;
 msg+=`%0A💰 Total: ₹${total}%0A%0A📦 View Final Cart:%0A${link}`;
-
 window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
 
 cart={};
@@ -270,12 +269,13 @@ updateCount();
 cartModal.style.display="none";
 }
 
+/* ---------- NAV ---------- */
 window.onpopstate=()=>{
 modal.style.display="none";
 cartModal.style.display="none";
 };
 
-/* PWA INSTALL */
+/* ---------- PWA INSTALL ---------- */
 let deferredPrompt;
 window.addEventListener("beforeinstallprompt",e=>{
 e.preventDefault();
@@ -284,16 +284,10 @@ if(!window.matchMedia('(display-mode: standalone)').matches){
 installBtn.style.display="block";
 }
 });
-
 installBtn.onclick=async()=>{
 installBtn.style.display="none";
 await deferredPrompt.prompt();
-deferredPrompt=null;
 };
-
-if(window.matchMedia('(display-mode: standalone)').matches){
-installBtn.style.display="none";
-}
 
 if("serviceWorker" in navigator){
 navigator.serviceWorker.register("service-worker.js");
