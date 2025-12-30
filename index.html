@@ -263,13 +263,19 @@ cartModal.style.display="none";
 }
 
 function checkFrozenOrder(){
-const oid=new URLSearchParams(location.search).get("order");
-if(!oid) return;
-const data=localStorage.getItem("order_"+oid);
-if(data){
-cart=JSON.parse(data);
-setTimeout(openCart,300);
-}
+  const oid = new URLSearchParams(location.search).get("order");
+  if(!oid) return;
+
+  const data = localStorage.getItem("order_" + oid);
+  if(!data) return;
+
+  cart = JSON.parse(data);
+
+  /* force cart open after UI is ready */
+  requestAnimationFrame(()=>{
+    renderCart();
+    cartModal.style.display = "block";
+  });
 }
 
 window.onpopstate=()=>{
