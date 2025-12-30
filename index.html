@@ -27,8 +27,8 @@ header{background:#25D366;color:#fff;padding:14px;text-align:center;font-size:18
 .price{color:#2e7d32;font-weight:bold}
 del{color:#888;font-size:12px}
 
-.cardQty{display:flex;justify-content:center;gap:12px;margin-top:6px}
-.cardQty button{padding:6px 14px;border:none;background:#25D366;border-radius:6px;color:#fff}
+.cardQty{display:flex;gap:10px;align-items:center}
+.cardQty button{padding:6px 12px;border:none;background:#25D366;border-radius:6px}
 
 #cartBtn{
 position:fixed;bottom:22px;right:22px;background:#25D366;
@@ -39,6 +39,19 @@ font-size:28px;z-index:200
 #cartCount{
 position:absolute;top:-6px;right:-6px;background:red;
 color:#fff;border-radius:50%;padding:4px 8px;font-size:13px
+}
+
+#installBtn{
+display:none;
+position:fixed;
+bottom:100px;
+right:22px;
+padding:12px 16px;
+background:#25D366;
+color:#fff;
+border:none;
+border-radius:30px;
+z-index:300
 }
 
 #modal,#cartModal{
@@ -55,7 +68,8 @@ overflow-y:auto;padding:14px;box-sizing:border-box
 }
 
 .gallery{
-display:flex;overflow-x:auto;gap:10px;scroll-snap-type:x mandatory
+display:flex;overflow-x:auto;gap:10px;
+scroll-snap-type:x mandatory
 }
 .gallery img{
 width:100%;max-width:420px;flex-shrink:0;
@@ -81,6 +95,7 @@ width:48px;height:48px;object-fit:cover;border-radius:6px
 <div id="products"></div>
 
 <div id="cartBtn" onclick="openCart()">🛒<span id="cartCount">0</span></div>
+<button id="installBtn">Install App</button>
 
 <div id="modal"></div>
 <div id="cartModal"></div>
@@ -92,40 +107,34 @@ const sheetURL="https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgU
 const productsDiv=document.getElementById("products");
 const modal=document.getElementById("modal");
 const cartModal=document.getElementById("cartModal");
+const installBtn=document.getElementById("installBtn");
 
 let products=[];
 let cart=JSON.parse(localStorage.getItem("cart"))||{};
 let currentCat="All Products";
-let isFrozenOrder=false;
 
-fetch(sheetURL)
-.then(r=>r.json())
-.then(d=>{
-  products=d.map(p=>({
-    name:p.name,
-    cat:p.category,
-    price:+p.offer||+p.mrp,
-    mrp:+p.mrp,
-    desc:p.description,
-    imgs:p.images.split("|")
-  }));
-
-  renderCategories();
-  checkFrozenOrder();
-
-  if(!isFrozenOrder){
-    renderProducts();
-  }
+fetch(sheetURL).then(r=>r.json()).then(d=>{
+products=d.map(p=>({
+name:p.name,
+cat:p.category,
+price:+p.offer||+p.mrp,
+mrp:+p.mrp,
+desc:p.description,
+imgs:p.images.split("|")
+}));
+renderCategories();
+renderProducts();
+loadFrozenOrder();
 });
 
-search.oninput=()=>{ if(!isFrozenOrder) renderProducts(); };
+search.oninput=renderProducts;
 
 function renderCategories(){
 let cats=["All Products",...new Set(products.map(p=>p.cat))];
-categoryBar.innerHTML=cats.map(c=>`
-<button class="${c===currentCat?'active':''}"
-onclick="if(!isFrozenOrder){currentCat='${c}';renderCategories();renderProducts()}">
-${c}</button>`).join("");
+categoryBar.innerHTML=cats.map(c=>
+`<button class="${c===currentCat?'active':''}"
+onclick="currentCat='${c}';renderCategories();renderProducts()">${c}</button>`
+).join("");
 }
 
 function renderProducts(){
@@ -157,7 +166,7 @@ modal.innerHTML=`
 <div class="modalBox">
 <button onclick="history.back()">⬅ Back</button>
 <div class="gallery">
-${p.imgs.map(i=>`<img src="${i}">`).join("")}
+${p.imgs.map(i=>`<img src="${i}" loading="lazy">`).join("")}
 </div>
 <h3>${p.name}</h3>
 <p class="price">₹${p.price} <del>₹${p.mrp}</del></p>
@@ -176,7 +185,7 @@ function updateCart(name,val,refresh){
 cart[name]=(cart[name]||0)+val;
 if(cart[name]<=0) delete cart[name];
 localStorage.setItem("cart",JSON.stringify(cart));
-if(!isFrozenOrder) renderProducts();
+renderProducts();
 if(refresh) openProduct(name);
 if(cartModal.style.display==="block") renderCart();
 updateCount();
@@ -203,9 +212,14 @@ let p=products.find(x=>x.name===n);
 let t=p.price*cart[n]; total+=t;
 return `
 <div class="cartItem">
-<img src="${p.imgs[0]}">
+<img src="${p.imgs[0]}" loading="lazy">
 <div style="flex:1">
-<b>${n}</b><br>₹${p.price} × ${cart[n]}
+<b>${n}</b><br>₹${p.price}
+<div class="cardQty">
+<button onclick="updateCart('${n}',-1)">−</button>
+<span>${cart[n]}</span>
+<button onclick="updateCart('${n}',1)">+</button>
+</div>
 </div>
 <b>₹${t}</b>
 </div>`;
@@ -229,9 +243,8 @@ let p=products.find(x=>x.name===n);
 let t=p.price*cart[n]; total+=t;
 msg+=`• ${n} x ${cart[n]} = ₹${t}%0A`;
 }
-
-const link=location.origin+location.pathname+"?order="+id;
-msg+=`%0A💰 Total: ₹${total}%0A%0A📦 View Cart:%0A${link}`;
+const link=`${location.origin}${location.pathname}?order=${id}`;
+msg+=`%0A💰 Total: ₹${total}%0A%0A📦 View Final Cart:%0A${link}`;
 
 window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
 
@@ -241,27 +254,40 @@ updateCount();
 cartModal.style.display="none";
 }
 
-function checkFrozenOrder(){
-const oid=new URLSearchParams(location.search).get("order");
-if(!oid) return;
-
-const data=localStorage.getItem("order_"+oid);
-if(!data) return;
-
-isFrozenOrder=true;
+function loadFrozenOrder(){
+const id=new URLSearchParams(location.search).get("order");
+if(!id) return;
+const data=localStorage.getItem("order_"+id);
+if(data){
 cart=JSON.parse(data);
-
-requestAnimationFrame(()=>{
-renderCart();
-cartModal.style.display="block";
-updateCount();
-});
+setTimeout(openCart,300);
+}
 }
 
 window.onpopstate=()=>{
 modal.style.display="none";
 cartModal.style.display="none";
 };
+
+/* PWA INSTALL */
+let deferredPrompt;
+window.addEventListener("beforeinstallprompt",e=>{
+e.preventDefault();
+deferredPrompt=e;
+if(!window.matchMedia('(display-mode: standalone)').matches){
+installBtn.style.display="block";
+}
+});
+
+installBtn.onclick=async()=>{
+installBtn.style.display="none";
+await deferredPrompt.prompt();
+deferredPrompt=null;
+};
+
+if(window.matchMedia('(display-mode: standalone)').matches){
+installBtn.style.display="none";
+}
 
 if("serviceWorker" in navigator){
 navigator.serviceWorker.register("service-worker.js");
