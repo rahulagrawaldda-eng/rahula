@@ -237,16 +237,27 @@ localStorage.setItem("order_"+id,JSON.stringify(cart));
 
 let msg="Hello Agrima Mart 👋%0A%0A🧾 Order Details%0A";
 let total=0;
+
 for(let n in cart){
 let p=products.find(x=>x.name===n);
-let t=p.price*cart[n]; total+=t;
+let t=p.price*cart[n];
+total+=t;
 msg+=`• ${n} x ${cart[n]} = ₹${t}%0A`;
 }
-msg+=`%0A💰 Total: ₹${total}`;
+
+/* ✅ FINAL CART SNAPSHOT LINK */
+const link = `${location.origin}${location.pathname}?order=${id}`;
+
+msg+=`%0A💰 Total: ₹${total}%0A`;
+msg+=`%0A📦 View Final Cart:%0A${link}`;
+
 window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
 
-cart={};localStorage.removeItem("cart");
-updateCount();cartModal.style.display="none";
+/* clear live cart after placing order */
+cart={};
+localStorage.removeItem("cart");
+updateCount();
+cartModal.style.display="none";
 }
 
 function checkFrozenOrder(){
