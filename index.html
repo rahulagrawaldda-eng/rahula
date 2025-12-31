@@ -87,6 +87,7 @@ display:none;z-index:300
 <header>Agrima Mart</header>
 
 <div id="products"></div>
+
 <div id="cartBtn" onclick="openCart()">🛒<span id="cartCount">0</span></div>
 <button id="installBtn">📲 Install Agrima Mart</button>
 
@@ -99,13 +100,15 @@ const sheetURL="https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgU
 
 let products=[];
 let cart=JSON.parse(localStorage.getItem("cart"))||{};
-let frozen=null;
+let frozen=false;
+let modalOpen=false;
+let cartOpen=false;
 
 const productsDiv=document.getElementById("products");
 const modal=document.getElementById("modal");
 const cartModal=document.getElementById("cartModal");
 
-/* Frozen cart from link */
+/* 🔒 Frozen cart from WhatsApp link */
 const qs=new URLSearchParams(location.search);
 if(qs.get("o")){
 cart=JSON.parse(LZString.decompressFromEncodedURIComponent(qs.get("o")));
@@ -125,7 +128,7 @@ renderProducts();
 if(frozen) setTimeout(openCart,300);
 });
 
-/* Product listing */
+/* Render product list */
 function renderProducts(){
 productsDiv.innerHTML=products.map(p=>{
 let q=cart[p.name]||0;
@@ -144,13 +147,13 @@ return `
 updateCount();
 }
 
-/* Product detail */
+/* Product details */
 function openProduct(name){
 const p=products.find(x=>x.name===name);
 const q=cart[name]||0;
 modal.innerHTML=`
 <div class="modalBox">
-<button onclick="closeModal()">⬅ Back</button>
+<button onclick="closeProduct()">⬅ Back</button>
 <div class="gallery">
 ${p.imgs.map(i=>`<img src="${i}" loading="lazy">`).join("")}
 </div>
@@ -164,29 +167,19 @@ ${p.imgs.map(i=>`<img src="${i}" loading="lazy">`).join("")}
 </div>
 </div>`;
 modal.style.display="block";
-}
-
-/* Cart update */
-function updateCart(n,v,stay){
-cart[n]=(cart[n]||0)+v;
-if(cart[n]<=0) delete cart[n];
-localStorage.setItem("cart",JSON.stringify(cart));
-renderProducts();
-if(stay) openProduct(n);
-if(cartModal.style.display==="block") renderCart();
-}
-
-/* Cart count */
-function updateCount(){
-cartCount.innerText=Object.values(cart).reduce((a,b)=>a+b,0);
+modalOpen=true;
+history.pushState({page:"product"},"");
 }
 
 /* Cart */
 function openCart(){
 renderCart();
 cartModal.style.display="block";
+cartOpen=true;
+history.pushState({page:"cart"},"");
 }
 
+/* Render cart */
 function renderCart(){
 let total=0;
 cartModal.innerHTML=`
@@ -219,7 +212,22 @@ Place Order on WhatsApp
 </div>`;
 }
 
-/* WhatsApp checkout */
+/* Update cart */
+function updateCart(n,v,stay){
+cart[n]=(cart[n]||0)+v;
+if(cart[n]<=0) delete cart[n];
+localStorage.setItem("cart",JSON.stringify(cart));
+renderProducts();
+if(stay) openProduct(n);
+if(cartOpen) renderCart();
+}
+
+/* Count */
+function updateCount(){
+cartCount.innerText=Object.values(cart).reduce((a,b)=>a+b,0);
+}
+
+/* Checkout */
 function checkout(){
 const compressed=LZString.compressToEncodedURIComponent(JSON.stringify(cart));
 let msg="Hello Agrima Mart 👋%0A%0A🧾 Order Details%0A";
@@ -234,14 +242,37 @@ msg+=`%0A💰 Total: ₹${total}%0A%0A📦 View Cart:%0A${link}`;
 window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
 }
 
-/* Close */
-function closeModal(){modal.style.display="none";}
-function closeCart(){cartModal.style.display="none";}
+/* Close handlers */
+function closeProduct(){
+modal.style.display="none";
+modalOpen=false;
+history.back();
+}
+function closeCart(){
+cartModal.style.display="none";
+cartOpen=false;
+history.back();
+}
+
+/* 🔙 BACK BUTTON FIX */
+window.onpopstate=()=>{
+if(modalOpen){
+modal.style.display="none";
+modalOpen=false;
+return;
+}
+if(cartOpen){
+cartModal.style.display="none";
+cartOpen=false;
+return;
+}
+};
 
 /* Install App */
 let deferredPrompt;
 window.addEventListener("beforeinstallprompt",e=>{
-e.preventDefault(); deferredPrompt=e;
+e.preventDefault();
+deferredPrompt=e;
 if(!matchMedia('(display-mode: standalone)').matches)
 installBtn.style.display="block";
 });
