@@ -87,6 +87,7 @@ display:none;z-index:300
 
 <input id="search" placeholder="Search products...">
 <div id="categoryBar"></div>
+
 <div id="products"></div>
 
 <div id="cartBtn" onclick="openCart()">🛒<span id="cartCount">0</span></div>
@@ -96,18 +97,23 @@ display:none;z-index:300
 <div id="cartModal"></div>
 
 <script>
-history.replaceState({page:"home"},"");
-
 const phone="919929333794";
 const sheetURL="https://opensheet.elk.sh/1sGSXFUrgvSXMVvPWvpk2JHBIcl2dRf5LBan_vigLIHE/Sheet1";
 
 let products=[],cart=JSON.parse(localStorage.getItem("cart"))||{};
-let currentCat="All Products";
+let currentCat="All Products", frozen=false;
 let modalOpen=false, cartOpen=false;
 
 const productsDiv=document.getElementById("products");
 const modal=document.getElementById("modal");
 const cartModal=document.getElementById("cartModal");
+
+/* Frozen cart */
+const qs=new URLSearchParams(location.search);
+if(qs.get("o")){
+cart=JSON.parse(LZString.decompressFromEncodedURIComponent(qs.get("o")));
+frozen=true;
+}
 
 /* Load products */
 fetch(sheetURL).then(r=>r.json()).then(d=>{
@@ -121,6 +127,7 @@ imgs:p.images.split("|")
 }));
 renderCategories();
 renderProducts();
+if(frozen) setTimeout(openCart,300);
 });
 
 search.oninput=renderProducts;
@@ -176,7 +183,7 @@ modal.innerHTML=`
 </div>`;
 modal.style.display="block";
 modalOpen=true;
-history.pushState({page:"product"},"");
+history.pushState({},"");
 }
 
 /* Cart */
@@ -184,7 +191,7 @@ function openCart(){
 renderCart();
 cartModal.style.display="block";
 cartOpen=true;
-history.pushState({page:"cart"},"");
+history.pushState({},"");
 }
 
 function renderCart(){
@@ -235,6 +242,7 @@ cartCount.innerText=Object.values(cart).reduce((a,b)=>a+b,0);
 
 /* Checkout */
 function checkout(){
+const compressed=LZString.compressToEncodedURIComponent(JSON.stringify(cart));
 let msg="Hello Agrima Mart 👋%0A%0A🧾 Order Details%0A";
 let total=0;
 for(let n in cart){
@@ -242,7 +250,8 @@ let p=products.find(x=>x.name===n);
 let t=p.price*cart[n]; total+=t;
 msg+=`• ${n} × ${cart[n]} = ₹${t}%0A`;
 }
-msg+=`%0A💰 Total: ₹${total}`;
+const link=`${location.origin}${location.pathname}?o=${compressed}`;
+msg+=`%0A💰 Total: ₹${total}%0A%0A📦 View Cart:%0A${link}`;
 window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
 
 cart={};
@@ -253,25 +262,56 @@ cartModal.style.display="none";
 cartOpen=false;
 }
 
-/* Back handling */
-window.onpopstate=()=>{
-if(modalOpen){
-modal.style.display="none";
-modalOpen=false;
-return;
-}
-if(cartOpen){
-cartModal.style.display="none";
-cartOpen=false;
-return;
-}
-if(search.value){
-search.value="";
-renderProducts();
-history.pushState({page:"home"},"");
-}
+/* Back fix */
+<script>
+let backCount = 0;
+
+window.onpopstate = () => {
+
+  /* Close product modal */
+  if (modalOpen) {
+    modal.style.display = "none";
+    modalOpen = false;
+
+    // CLEAR SEARCH
+    search.value = "";
+    renderProducts();
+    return;
+  }
+
+  /* Close cart */
+  if (cartOpen) {
+    cartModal.style.display = "none";
+    cartOpen = false;
+
+    // CLEAR SEARCH
+    search.value = "";
+    renderProducts();
+    return;
+  }
+
+  /* Handle app exit */
+  backCount++;
+  if (backCount >= 2) {
+    window.close(); // works in PWA
+  }
+};
+</script>
+
+/* Install button */
+let deferredPrompt;
+window.addEventListener("beforeinstallprompt",e=>{
+e.preventDefault();deferredPrompt=e;
+if(!matchMedia('(display-mode: standalone)').matches)
+installBtn.style.display="block";
+});
+installBtn.onclick=async()=>{
+deferredPrompt.prompt();
+await deferredPrompt.userChoice;
+installBtn.style.display="none";
 };
 </script>
 
 </body>
 </html>
+
