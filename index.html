@@ -89,6 +89,28 @@ display:none;z-index:300
 </style>
 </head>
 <script>
+<script>
+(function () {
+  window.addEventListener("popstate", function () {
+    const searchInput =
+      document.querySelector('input[type="search"]') ||
+      document.getElementById("search") ||
+      document.querySelector(".search-input");
+
+    if (searchInput && searchInput.value.trim() !== "") {
+      // Clear search text
+      searchInput.value = "";
+
+      // Trigger input event so product list resets
+      searchInput.dispatchEvent(new Event("input"));
+
+      // Prevent further back handling
+      history.pushState({}, "", location.href);
+    }
+  });
+})();
+</script>
+
 (function () {
   let lastBackTime = 0;
 
@@ -334,42 +356,6 @@ await deferredPrompt.userChoice;
 installBtn.style.display="none";
 };
 </script>
-...
-/* Install App */
-let deferredPrompt;
-window.addEventListener("beforeinstallprompt",e=>{
-  e.preventDefault();
-  deferredPrompt=e;
-  if(!matchMedia('(display-mode: standalone)').matches)
-    installBtn.style.display="block";
-});
-installBtn.onclick=async()=>{
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
-  installBtn.style.display="none";
-};
-</script>
-
-<!-- ✅ ADD THIS HERE -->
-<script>
-(function () {
-  window.addEventListener("popstate", function () {
-    const searchInput =
-      document.querySelector('input[type="search"]') ||
-      document.getElementById("search") ||
-      document.querySelector(".search-input");
-
-    if (searchInput && searchInput.value.trim() !== "") {
-      searchInput.value = "";
-      searchInput.dispatchEvent(new Event("input"));
-      history.pushState({}, "", location.href);
-    }
-  });
-})();
-</script>
-
-</body>
-</html>
 
 </body>
 </html>
