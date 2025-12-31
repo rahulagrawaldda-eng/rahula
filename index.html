@@ -7,74 +7,48 @@
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#25D366">
-
-<!-- Short URL compression -->
 <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
 
 <style>
-body{margin:0;font-family:Arial;background:#fff}
-header{background:#25D366;color:#fff;padding:14px;text-align:center;font-size:18px;position:sticky;top:0;z-index:10}
-
-#search{width:94%;margin:10px auto;padding:10px;display:block}
-#categoryBar{display:flex;overflow-x:auto;padding:8px;background:#eee}
-#categoryBar button{margin-right:8px;border:none;border-radius:20px;padding:8px 14px}
-#categoryBar .active{background:#25D366;color:#fff}
-
+body{margin:0;font-family:Arial}
+header{background:#25D366;color:#fff;padding:14px;text-align:center;font-size:18px;position:sticky;top:0}
 #products{display:grid;gap:12px;padding:12px}
 @media(max-width:600px){#products{grid-template-columns:repeat(2,1fr)}}
 @media(min-width:601px){#products{grid-template-columns:repeat(5,1fr)}}
-
 .product{border:1px solid #ddd;border-radius:10px;padding:8px}
 .product img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px}
-
 .price{color:#2e7d32;font-weight:bold}
 del{color:#888;font-size:12px}
 
-.cardQty{display:flex;justify-content:center;gap:12px;margin-top:6px}
-.cardQty button{padding:6px 14px;border:none;background:#25D366;border-radius:6px}
+.qty{display:flex;gap:12px;align-items:center;justify-content:center}
+.qty button{padding:6px 14px;background:#25D366;color:#fff;border:none;border-radius:6px}
 
 #cartBtn{
-position:fixed;bottom:22px;right:22px;background:#25D366;
+position:fixed;bottom:22px;right:22px;
 width:64px;height:64px;border-radius:50%;
-display:flex;align-items:center;justify-content:center;
-font-size:28px;z-index:200
+background:#25D366;color:#fff;
+display:flex;align-items:center;justify-content:center;font-size:26px
 }
 #cartCount{
-position:absolute;top:-6px;right:-6px;background:red;
-color:#fff;border-radius:50%;padding:4px 8px;font-size:13px
+position:absolute;top:-6px;right:-6px;
+background:red;color:#fff;border-radius:50%;
+padding:4px 8px;font-size:13px
 }
 
 #modal,#cartModal{
 display:none;position:fixed;top:0;left:0;
 width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999
 }
+.modalBox{background:#fff;height:100%;overflow:auto;padding:14px}
 
-.modalBox{
-background:#fff;width:100%;height:100%;
-overflow-y:auto;padding:14px;box-sizing:border-box
-}
+.cartItem{display:flex;gap:10px;align-items:center;border-bottom:1px solid #ddd;padding:8px 0}
+.cartItem img{width:48px;height:48px;border-radius:6px;object-fit:cover}
 
-.gallery{display:flex;overflow-x:auto;gap:10px;scroll-snap-type:x mandatory}
-.gallery img{width:100%;max-width:420px;scroll-snap-align:center;border-radius:10px}
-
-.cartItem{display:flex;align-items:center;gap:10px;border-bottom:1px solid #ddd;padding:8px 0}
-.cartItem img{width:48px;height:48px;object-fit:cover;border-radius:6px}
-
-/* Install App Button */
 #installBtn{
-position:fixed;
-bottom:100px;
-right:22px;
-padding:14px 18px;
-background:#000;
-color:#fff;
-border:none;
-border-radius:30px;
-font-size:14px;
-box-shadow:0 4px 10px rgba(0,0,0,.3);
-display:none;
-z-index:300;
-cursor:pointer;
+position:fixed;bottom:100px;right:22px;
+padding:14px 18px;border-radius:30px;
+background:#000;color:#fff;border:none;
+display:none;z-index:300
 }
 </style>
 </head>
@@ -83,12 +57,8 @@ cursor:pointer;
 
 <header>Agrima Mart</header>
 
-<input id="search" placeholder="Search products...">
-<div id="categoryBar"></div>
 <div id="products"></div>
-
 <div id="cartBtn" onclick="openCart()">🛒<span id="cartCount">0</span></div>
-
 <button id="installBtn">📲 Install Agrima Mart</button>
 
 <div id="modal"></div>
@@ -98,105 +68,55 @@ cursor:pointer;
 const phone="919929333794";
 const sheetURL="https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgUXWdE4/Sheet1";
 
-const productsDiv=document.getElementById("products");
-const modal=document.getElementById("modal");
-const cartModal=document.getElementById("cartModal");
-const installBtn=document.getElementById("installBtn");
-
 let products=[];
 let cart=JSON.parse(localStorage.getItem("cart"))||{};
-let currentCat="All Products";
 let frozenCart=null;
 
-/* decode frozen cart early */
-(()=>{
-const p=new URLSearchParams(location.search);
-const o=p.get("o");
-if(o){
-try{ frozenCart=JSON.parse(LZString.decompressFromEncodedURIComponent(o)); }
-catch(e){}
-}
-})();
+const productsDiv=document.getElementById("products");
+const cartModal=document.getElementById("cartModal");
 
-/* fetch products */
+/* Frozen cart */
+const p=new URLSearchParams(location.search);
+if(p.get("o")){
+frozenCart=JSON.parse(LZString.decompressFromEncodedURIComponent(p.get("o")));
+cart=frozenCart;
+}
+
+/* Fetch products */
 fetch(sheetURL).then(r=>r.json()).then(d=>{
 products=d.map(p=>({
 name:p.name,
-cat:p.category,
 price:+p.offer||+p.mrp,
 mrp:+p.mrp,
-desc:p.description,
 imgs:p.images.split("|")
 }));
-renderCategories();
-
-if(frozenCart){
-cart=frozenCart;
-updateCount();
-setTimeout(openCart,200);
-return;
-}
 renderProducts();
 });
 
-search.oninput=renderProducts;
-
-function renderCategories(){
-let cats=["All Products",...new Set(products.map(p=>p.cat))];
-categoryBar.innerHTML=cats.map(c=>`
-<button class="${c===currentCat?'active':''}"
-onclick="currentCat='${c}';renderCategories();renderProducts()">${c}</button>`
-).join("");
-}
-
+/* Render products */
 function renderProducts(){
-let q=search.value.toLowerCase();
-productsDiv.innerHTML=products.filter(p=>
-(currentCat==="All Products"||p.cat===currentCat)&&
-p.name.toLowerCase().includes(q)
-).map(p=>{
-let qty=cart[p.name]||0;
+productsDiv.innerHTML=products.map(p=>{
+let q=cart[p.name]||0;
 return `
 <div class="product">
-<img src="${p.imgs[0]}" loading="lazy" onclick="openProduct('${p.name}')">
+<img src="${p.imgs[0]}" loading="lazy">
 <h4>${p.name}</h4>
 <p class="price">₹${p.price} <del>₹${p.mrp}</del></p>
-<div class="cardQty">
+<div class="qty">
 <button onclick="updateCart('${p.name}',-1)">−</button>
-<span>${qty}</span>
+<span>${q}</span>
 <button onclick="updateCart('${p.name}',1)">+</button>
-</div></div>`;
+</div>
+</div>`;
 }).join("");
 updateCount();
 }
 
-function openProduct(name){
-let p=products.find(x=>x.name===name);
-let qty=cart[p.name]||0;
-modal.innerHTML=`
-<div class="modalBox">
-<button onclick="history.back()">⬅ Back</button>
-<div class="gallery">
-${p.imgs.map(i=>`<img src="${i}" loading="lazy">`).join("")}
-</div>
-<h3>${p.name}</h3>
-<p class="price">₹${p.price} <del>₹${p.mrp}</del></p>
-<p>${p.desc}</p>
-<div class="cardQty">
-<button onclick="updateCart('${p.name}',-1,true)">−</button>
-<span>${qty}</span>
-<button onclick="updateCart('${p.name}',1,true)">+</button>
-</div></div>`;
-modal.style.display="block";
-history.pushState({},"","#product");
-}
-
-function updateCart(name,val,refresh){
+function updateCart(name,val){
 cart[name]=(cart[name]||0)+val;
 if(cart[name]<=0) delete cart[name];
 localStorage.setItem("cart",JSON.stringify(cart));
 renderProducts();
-if(refresh) openProduct(name);
 if(cartModal.style.display==="block") renderCart();
 }
 
@@ -204,18 +124,19 @@ function updateCount(){
 cartCount.innerText=Object.values(cart).reduce((a,b)=>a+b,0);
 }
 
+/* Cart page WITH + − FIX */
 function openCart(){
 renderCart();
 cartModal.style.display="block";
-history.pushState({},"","#cart");
 }
 
 function renderCart(){
 let total=0;
 cartModal.innerHTML=`
 <div class="modalBox">
-<button onclick="history.back()">⬅ Back</button>
+<button onclick="cartModal.style.display='none'">⬅ Back</button>
 <h3>Your Cart</h3>
+
 ${Object.keys(cart).map(n=>{
 let p=products.find(x=>x.name===n);
 let t=p.price*cart[n]; total+=t;
@@ -223,13 +144,20 @@ return `
 <div class="cartItem">
 <img src="${p.imgs[0]}" loading="lazy">
 <div style="flex:1">
-<b>${n}</b><br>₹${p.price} × ${cart[n]}
+<b>${n}</b><br>
+<div class="qty">
+<button onclick="updateCart('${n}',-1)">−</button>
+<span>${cart[n]}</span>
+<button onclick="updateCart('${n}',1)">+</button>
+</div>
 </div>
 <b>₹${t}</b>
 </div>`;
 }).join("")}
+
 <hr>
 <h3 style="text-align:right">Total ₹${total}</h3>
+
 <button onclick="checkout()" style="width:100%;padding:14px;background:#25D366;color:#fff;border:none;border-radius:6px">
 Place Order on WhatsApp
 </button>
@@ -248,48 +176,21 @@ msg+=`• ${n} x ${cart[n]} = ₹${t}%0A`;
 const link=`${location.origin}${location.pathname}?o=${compressed}`;
 msg+=`%0A💰 Total: ₹${total}%0A%0A📦 View Cart:%0A${link}`;
 window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
-
-cart={};
-localStorage.removeItem("cart");
-updateCount();
-cartModal.style.display="none";
+cart={}; localStorage.clear(); updateCount(); cartModal.style.display="none";
 }
 
-window.onpopstate=()=>{
-modal.style.display="none";
-cartModal.style.display="none";
-};
-
-/* ---------- INSTALL APP LOGIC ---------- */
+/* Install App */
 let deferredPrompt;
-
-window.addEventListener("beforeinstallprompt", e=>{
-e.preventDefault();
-deferredPrompt=e;
-
-/* hide inside installed app */
-if(window.matchMedia('(display-mode: standalone)').matches) return;
-
+window.addEventListener("beforeinstallprompt",e=>{
+e.preventDefault(); deferredPrompt=e;
+if(!matchMedia('(display-mode: standalone)').matches)
 installBtn.style.display="block";
 });
-
 installBtn.onclick=async()=>{
-if(!deferredPrompt) return;
 deferredPrompt.prompt();
 await deferredPrompt.userChoice;
-deferredPrompt=null;
 installBtn.style.display="none";
 };
-
-/* hide install button inside PWA */
-if(window.matchMedia('(display-mode: standalone)').matches){
-installBtn.style.display="none";
-}
-
-/* ---------- SERVICE WORKER ---------- */
-if("serviceWorker" in navigator){
-navigator.serviceWorker.register("service-worker.js");
-}
 </script>
 
 </body>
