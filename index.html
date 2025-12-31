@@ -88,6 +88,61 @@ display:none;z-index:300
 }
 </style>
 </head>
+<script>
+(function () {
+  let lastBackTime = 0;
+
+  // Push initial state so back button is captured
+  history.pushState({ page: "home" }, "", location.href);
+
+  window.addEventListener("popstate", function (e) {
+    const now = Date.now();
+
+    if (now - lastBackTime < 2000) {
+      // ✅ Second back → allow exit
+      window.removeEventListener("popstate", arguments.callee);
+      history.back();
+      return;
+    }
+
+    // ❌ First back → block exit
+    lastBackTime = now;
+
+    history.pushState({ page: "lock" }, "", location.href);
+
+    showExitToast();
+  });
+
+  function showExitToast() {
+    let toast = document.getElementById("exit-toast");
+
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "exit-toast";
+      toast.innerText = "Press back again to exit";
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.8);
+        color: #fff;
+        padding: 10px 16px;
+        border-radius: 6px;
+        font-size: 14px;
+        z-index: 9999;
+      `;
+      document.body.appendChild(toast);
+    }
+
+    toast.style.display = "block";
+
+    setTimeout(() => {
+      toast.style.display = "none";
+    }, 1500);
+  }
+})();
+</script>
 
 <body>
 
