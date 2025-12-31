@@ -232,26 +232,29 @@ function checkout(){
 const compressed=LZString.compressToEncodedURIComponent(JSON.stringify(cart));
 let msg="Hello Agrima Mart 👋%0A%0A🧾 Order Details%0A";
 let total=0;
+
 for(let n in cart){
 let p=products.find(x=>x.name===n);
-let t=p.price*cart[n]; total+=t;
+let t=p.price*cart[n];
+total+=t;
 msg+=`• ${n} × ${cart[n]} = ₹${t}%0A`;
 }
+
 const link=`${location.origin}${location.pathname}?o=${compressed}`;
 msg+=`%0A💰 Total: ₹${total}%0A%0A📦 View Cart:%0A${link}`;
-window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
-}
 
-/* Close handlers */
-function closeProduct(){
-modal.style.display="none";
-modalOpen=false;
-history.back();
-}
-function closeCart(){
+/* ✅ OPEN WHATSAPP */
+window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
+
+/* ✅ CLEAR CART AFTER ORDER */
+cart={};
+localStorage.removeItem("cart");
+updateCount();
+renderProducts();
+
+/* ✅ CLOSE CART MODAL */
 cartModal.style.display="none";
 cartOpen=false;
-history.back();
 }
 
 /* 🔙 BACK BUTTON FIX */
