@@ -13,16 +13,6 @@
 body{margin:0;font-family:Arial;background:#fff}
 header{background:#25D366;color:#fff;padding:14px;text-align:center;font-size:18px;position:sticky;top:0;z-index:10}
 
-/* Search + Category */
-#search{width:94%;margin:10px auto;padding:10px;display:block}
-#categoryBar{display:flex;gap:8px;overflow-x:auto;padding:8px;background:#eee}
-#categoryBar button{
-border:none;padding:8px 14px;border-radius:20px;
-background:#ddd;white-space:nowrap;cursor:pointer
-}
-#categoryBar .active{background:#25D366;color:#fff}
-
-/* Products */
 #products{display:grid;gap:12px;padding:12px}
 @media(max-width:600px){#products{grid-template-columns:repeat(2,1fr)}}
 @media(min-width:601px){#products{grid-template-columns:repeat(5,1fr)}}
@@ -36,7 +26,6 @@ del{color:#888;font-size:12px}
 .qty{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:6px}
 .qty button{padding:6px 14px;border:none;background:#25D366;color:#fff;border-radius:6px}
 
-/* Cart Button */
 #cartBtn{
 position:fixed;bottom:22px;right:22px;
 width:64px;height:64px;border-radius:50%;
@@ -50,28 +39,33 @@ background:red;color:#fff;border-radius:50%;
 padding:4px 8px;font-size:13px
 }
 
-/* Modals */
 #modal,#cartModal{
 display:none;position:fixed;top:0;left:0;
 width:100%;height:100%;
 background:rgba(0,0,0,.5);z-index:999
 }
-.modalBox{background:#fff;height:100%;overflow-y:auto;padding:14px}
 
-/* Gallery */
+.modalBox{
+background:#fff;height:100%;
+overflow-y:auto;padding:14px
+}
+
 .gallery{
-display:flex;gap:10px;overflow-x:auto;
+display:flex;gap:10px;
+overflow-x:auto;
 scroll-snap-type:x mandatory
 }
 .gallery img{
-width:100%;max-width:420px;
-flex-shrink:0;border-radius:10px;
+width:100%;
+max-width:420px;
+flex-shrink:0;
+border-radius:10px;
 scroll-snap-align:center
 }
 
-/* Cart */
 .cartItem{
-display:flex;gap:10px;border-bottom:1px solid #ddd;
+display:flex;gap:10px;
+border-bottom:1px solid #ddd;
 padding:8px 0;align-items:center
 }
 .cartItem img{
@@ -79,7 +73,6 @@ width:50px;height:50px;
 object-fit:cover;border-radius:6px
 }
 
-/* Install */
 #installBtn{
 position:fixed;bottom:100px;right:22px;
 padding:14px 18px;border-radius:30px;
@@ -88,90 +81,11 @@ display:none;z-index:300
 }
 </style>
 </head>
-<script>
-<script>
-(function () {
-  window.addEventListener("popstate", function () {
-    const searchInput =
-      document.querySelector('input[type="search"]') ||
-      document.getElementById("search") ||
-      document.querySelector(".search-input");
-
-    if (searchInput && searchInput.value.trim() !== "") {
-      // Clear search text
-      searchInput.value = "";
-
-      // Trigger input event so product list resets
-      searchInput.dispatchEvent(new Event("input"));
-
-      // Prevent further back handling
-      history.pushState({}, "", location.href);
-    }
-  });
-})();
-</script>
-
-(function () {
-  let lastBackTime = 0;
-
-  // Push initial state so back button is captured
-  history.pushState({ page: "home" }, "", location.href);
-
-  window.addEventListener("popstate", function (e) {
-    const now = Date.now();
-
-    if (now - lastBackTime < 2000) {
-      // ✅ Second back → allow exit
-      window.removeEventListener("popstate", arguments.callee);
-      history.back();
-      return;
-    }
-
-    // ❌ First back → block exit
-    lastBackTime = now;
-
-    history.pushState({ page: "lock" }, "", location.href);
-
-    showExitToast();
-  });
-
-  function showExitToast() {
-    let toast = document.getElementById("exit-toast");
-
-    if (!toast) {
-      toast = document.createElement("div");
-      toast.id = "exit-toast";
-      toast.innerText = "Press back again to exit";
-      toast.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0,0,0,0.8);
-        color: #fff;
-        padding: 10px 16px;
-        border-radius: 6px;
-        font-size: 14px;
-        z-index: 9999;
-      `;
-      document.body.appendChild(toast);
-    }
-
-    toast.style.display = "block";
-
-    setTimeout(() => {
-      toast.style.display = "none";
-    }, 1500);
-  }
-})();
-</script>
 
 <body>
 
 <header>Agrima Mart</header>
 
-<input id="search" placeholder="Search products...">
-<div id="categoryBar"></div>
 <div id="products"></div>
 
 <div id="cartBtn" onclick="openCart()">🛒<span id="cartCount">0</span></div>
@@ -186,16 +100,15 @@ const sheetURL="https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgU
 
 let products=[];
 let cart=JSON.parse(localStorage.getItem("cart"))||{};
-let currentCat="All";
-let frozen=false, modalOpen=false, cartOpen=false;
+let frozen=false;
+let modalOpen=false;
+let cartOpen=false;
 
 const productsDiv=document.getElementById("products");
 const modal=document.getElementById("modal");
 const cartModal=document.getElementById("cartModal");
-const search=document.getElementById("search");
-const categoryBar=document.getElementById("categoryBar");
 
-/* Frozen cart */
+/* 🔒 Frozen cart from WhatsApp link */
 const qs=new URLSearchParams(location.search);
 if(qs.get("o")){
 cart=JSON.parse(LZString.decompressFromEncodedURIComponent(qs.get("o")));
@@ -206,33 +119,18 @@ frozen=true;
 fetch(sheetURL).then(r=>r.json()).then(d=>{
 products=d.map(p=>({
 name:p.name,
-cat:p.category||"General",
 price:+p.offer||+p.mrp,
 mrp:+p.mrp,
 desc:p.description||"",
 imgs:p.images.split("|")
 }));
-renderCategories();
 renderProducts();
 if(frozen) setTimeout(openCart,300);
 });
 
-/* Categories */
-function renderCategories(){
-const cats=["All",...new Set(products.map(p=>p.cat))];
-categoryBar.innerHTML=cats.map(c=>`
-<button class="${c===currentCat?'active':''}"
-onclick="currentCat='${c}';renderCategories();renderProducts()">
-${c}</button>`).join("");
-}
-
-/* Products */
-search.oninput=renderProducts;
+/* Render product list */
 function renderProducts(){
-productsDiv.innerHTML=products.filter(p=>
-(currentCat==="All"||p.cat===currentCat) &&
-p.name.toLowerCase().includes(search.value.toLowerCase())
-).map(p=>{
+productsDiv.innerHTML=products.map(p=>{
 let q=cart[p.name]||0;
 return `
 <div class="product" onclick="openProduct('${p.name}')">
@@ -243,17 +141,19 @@ return `
 <button onclick="updateCart('${p.name}',-1)">−</button>
 <span>${q}</span>
 <button onclick="updateCart('${p.name}',1)">+</button>
-</div></div>`;
+</div>
+</div>`;
 }).join("");
 updateCount();
 }
 
-/* Product Modal */
+/* Product details */
 function openProduct(name){
 const p=products.find(x=>x.name===name);
+const q=cart[name]||0;
 modal.innerHTML=`
 <div class="modalBox">
-<button onclick="history.back()">⬅ Back</button>
+<button onclick="closeProduct()">⬅ Back</button>
 <div class="gallery">
 ${p.imgs.map(i=>`<img src="${i}" loading="lazy">`).join("")}
 </div>
@@ -262,12 +162,18 @@ ${p.imgs.map(i=>`<img src="${i}" loading="lazy">`).join("")}
 <p>${p.desc}</p>
 <div class="qty">
 <button onclick="updateCart('${p.name}',-1,true)">−</button>
-<span>${cart[p.name]||0}</span>
+<span>${q}</span>
 <button onclick="updateCart('${p.name}',1,true)">+</button>
-</div></div>`;
+</div>
+</div>`;
 modal.style.display="block";
 modalOpen=true;
-history.pushState({},"");
+history.pushState({page:"product"},"");
+}
+function closeProduct(){
+modal.style.display="none";
+modalOpen=false;
+history.back();
 }
 
 /* Cart */
@@ -275,13 +181,20 @@ function openCart(){
 renderCart();
 cartModal.style.display="block";
 cartOpen=true;
-history.pushState({},"");
+history.pushState({page:"cart"},"");
 }
+function closeCart(){
+cartModal.style.display="none";
+cartOpen=false;
+history.back();
+}
+
+/* Render cart */
 function renderCart(){
 let total=0;
 cartModal.innerHTML=`
 <div class="modalBox">
-<button onclick="history.back()">⬅ Back</button>
+<button onclick="closeCart()">⬅ Back</button>
 <h3>Your Cart</h3>
 ${Object.keys(cart).map(n=>{
 let p=products.find(x=>x.name===n);
@@ -290,18 +203,22 @@ return `
 <div class="cartItem">
 <img src="${p.imgs[0]}" loading="lazy">
 <div style="flex:1">
-<b>${n}</b><br>₹${p.price} × ${cart[n]}
+<b>${n}</b><br>
+₹${p.price} × ${cart[n]}
 <div class="qty">
 <button onclick="updateCart('${n}',-1)">−</button>
 <span>${cart[n]}</span>
 <button onclick="updateCart('${n}',1)">+</button>
-</div></div>
-<b>₹${t}</b></div>`;
+</div>
+</div>
+<b>₹${t}</b>
+</div>`;
 }).join("")}
 <hr>
 <h3 style="text-align:right">Total ₹${total}</h3>
 <button onclick="checkout()" style="width:100%;padding:14px;background:#25D366;color:#fff;border:none;border-radius:6px">
-Place Order on WhatsApp</button>
+Place Order on WhatsApp
+</button>
 </div>`;
 }
 
@@ -325,28 +242,59 @@ function checkout(){
 const compressed=LZString.compressToEncodedURIComponent(JSON.stringify(cart));
 let msg="Hello Agrima Mart 👋%0A%0A🧾 Order Details%0A";
 let total=0;
+
 for(let n in cart){
 let p=products.find(x=>x.name===n);
-let t=p.price*cart[n]; total+=t;
+let t=p.price*cart[n];
+total+=t;
 msg+=`• ${n} × ${cart[n]} = ₹${t}%0A`;
 }
-msg+=`%0A💰 Total: ₹${total}%0A%0A📦 View Cart:%0A${location.origin}${location.pathname}?o=${compressed}`;
+
+const link=`${location.origin}${location.pathname}?o=${compressed}`;
+msg+=`%0A💰 Total: ₹${total}%0A%0A📦 View Cart:%0A${link}`;
+
 window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
-cart={};localStorage.removeItem("cart");
-renderProducts();updateCount();
-cartModal.style.display="none";cartOpen=false;
+
+cart={};
+localStorage.removeItem("cart");
+updateCount();
+renderProducts();
+cartModal.style.display="none";
+cartOpen=false;
 }
 
-/* Back button control */
+/* 🔙 BACK BUTTON – FINAL LOGIC */
 window.onpopstate=()=>{
-if(modalOpen){modal.style.display="none";modalOpen=false;return;}
-if(cartOpen){cartModal.style.display="none";cartOpen=false;return;}
+/* clear search text if exists */
+const searchInput =
+document.querySelector('input[type="search"]') ||
+document.getElementById("search") ||
+document.querySelector(".search-input");
+
+if(searchInput && searchInput.value.trim()!==""){
+searchInput.value="";
+searchInput.dispatchEvent(new Event("input"));
+history.pushState({}, "", location.href);
+return;
+}
+
+if(modalOpen){
+modal.style.display="none";
+modalOpen=false;
+return;
+}
+if(cartOpen){
+cartModal.style.display="none";
+cartOpen=false;
+return;
+}
 };
 
-/* Install */
+/* Install App */
 let deferredPrompt;
 window.addEventListener("beforeinstallprompt",e=>{
-e.preventDefault();deferredPrompt=e;
+e.preventDefault();
+deferredPrompt=e;
 if(!matchMedia('(display-mode: standalone)').matches)
 installBtn.style.display="block";
 });
