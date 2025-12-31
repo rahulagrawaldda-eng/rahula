@@ -104,9 +104,15 @@ let products=[],cart=JSON.parse(localStorage.getItem("cart"))||{};
 let currentCat="All Products", frozen=false;
 let modalOpen=false, cartOpen=false;
 
+let backPressCount=0;
+let backTimer=null;
+
 const productsDiv=document.getElementById("products");
 const modal=document.getElementById("modal");
 const cartModal=document.getElementById("cartModal");
+
+/* initial history state */
+history.pushState({home:true},"");
 
 /* Frozen cart */
 const qs=new URLSearchParams(location.search);
@@ -137,7 +143,7 @@ function renderCategories(){
 let cats=["All Products",...new Set(products.map(p=>p.cat))];
 categoryBar.innerHTML=cats.map(c=>
 `<button class="${c===currentCat?'active':''}"
-onclick="currentCat='${c}';renderCategories();renderProducts()">${c}</button>`
+onclick="currentCat='${c}';renderCategories();renderProducts();history.pushState({},'')">${c}</button>`
 ).join("");
 }
 
@@ -183,7 +189,7 @@ modal.innerHTML=`
 </div>`;
 modal.style.display="block";
 modalOpen=true;
-history.pushState({},"");
+history.pushState({}, "");
 }
 
 /* Cart */
@@ -191,7 +197,7 @@ function openCart(){
 renderCart();
 cartModal.style.display="block";
 cartOpen=true;
-history.pushState({},"");
+history.pushState({}, "");
 }
 
 function renderCart(){
@@ -262,39 +268,34 @@ cartModal.style.display="none";
 cartOpen=false;
 }
 
-/* Back fix */
+/* BACK BUTTON HANDLING */
+window.onpopstate=()=>{
+if(modalOpen){modal.style.display="none";modalOpen=false;return;}
+if(cartOpen){cartModal.style.display="none";cartOpen=false;return;}
 
-let backCount = 0;
+if(search.value!==""){
+search.value="";
+renderProducts();
+history.pushState({},"");
+return;
+}
 
-window.onpopstate = () => {
+if(currentCat!=="All Products"){
+currentCat="All Products";
+renderCategories();
+renderProducts();
+history.pushState({},"");
+return;
+}
 
-  /* Close product modal */
-  if (modalOpen) {
-    modal.style.display = "none";
-    modalOpen = false;
-
-    // CLEAR SEARCH
-    search.value = "";
-    renderProducts();
-    return;
-  }
-
-  /* Close cart */
-  if (cartOpen) {
-    cartModal.style.display = "none";
-    cartOpen = false;
-
-    // CLEAR SEARCH
-    search.value = "";
-    renderProducts();
-    return;
-  }
-
-  /* Handle app exit */
-  backCount++;
-  if (backCount >= 2) {
-    window.close(); // works in PWA
-  }
+backPressCount++;
+if(backPressCount===1){
+alert("Press back again to exit");
+backTimer=setTimeout(()=>backPressCount=0,2000);
+history.pushState({},"");
+}else{
+window.close();
+}
 };
 
 /* Install button */
@@ -313,4 +314,3 @@ installBtn.style.display="none";
 
 </body>
 </html>
-
