@@ -66,6 +66,36 @@ background:rgba(0,0,0,.5);z-index:999
 }
 .modalBox{background:#fff;height:100%;overflow-y:auto;padding:14px}
 
+/* IMAGE GALLERY (RESTORED) */
+.gallery{
+display:flex;gap:10px;overflow-x:auto;
+scroll-snap-type:x mandatory
+}
+.gallery img{
+width:100%;max-width:420px;
+flex-shrink:0;border-radius:10px;
+scroll-snap-align:center
+}
+
+/* CART ITEMS (RESTORED) */
+.cartItem{
+display:flex;gap:10px;
+border-bottom:1px solid #ddd;
+padding:8px 0;align-items:center
+}
+.cartItem img{
+width:50px;height:50px;
+object-fit:cover;border-radius:6px
+}
+
+/* INSTALL BUTTON */
+#installBtn{
+position:fixed;bottom:100px;right:22px;
+padding:14px 18px;border-radius:30px;
+background:#000;color:#fff;border:none;
+display:none;z-index:300
+}
+
 /* TOAST */
 #toast{
 position:fixed;bottom:40px;left:50%;
@@ -79,7 +109,6 @@ display:none;z-index:9999
 
 <body>
 
-<!-- HEADER WITH SOCIAL ICONS -->
 <header id="topHeader">
   <span class="title">Agrima Mart</span>
   <div class="headerSocial">
@@ -100,23 +129,21 @@ display:none;z-index:9999
 <div id="products"></div>
 
 <div id="cartBtn" onclick="openCart()">🛒<span id="cartCount">0</span></div>
+<button id="installBtn">📲 Install Agrima Mart</button>
 
 <div id="modal"></div>
 <div id="cartModal"></div>
 <div id="toast"></div>
 
 <script>
-/* BASIC CONFIG */
 const phone="919929333794";
 const sheetURL="https://opensheet.elk.sh/1sGSXFUrgvSXMVvPWvpk2JHBIcl2dRf5LBan_vigLIHE/Sheet1";
 
 let products=[],cart=JSON.parse(localStorage.getItem("cart"))||{};
-let currentCat="All Products";
-let modalOpen=false,cartOpen=false;
+let currentCat="All Products", frozen=false;
+let modalOpen=false, cartOpen=false;
 let renderLimit=20;
-let backCount=0;
 
-/* ELEMENTS */
 const productsDiv=document.getElementById("products");
 const modal=document.getElementById("modal");
 const cartModal=document.getElementById("cartModal");
@@ -128,7 +155,17 @@ toast.style.display="block";
 setTimeout(()=>toast.style.display="none",2000);
 }
 
-/* LOAD PRODUCTS FROM GOOGLE SHEET */
+/* INITIAL HISTORY */
+history.pushState({home:true},"");
+
+/* FROZEN CART SNAPSHOT */
+const qs=new URLSearchParams(location.search);
+if(qs.get("o")){
+cart=JSON.parse(LZString.decompressFromEncodedURIComponent(qs.get("o")));
+frozen=true;
+}
+
+/* LOAD PRODUCTS */
 fetch(sheetURL).then(r=>r.json()).then(d=>{
 products=d.map(p=>({
 name:p.name,
@@ -141,27 +178,23 @@ imgs:p.images.split("|")
 restoreState();
 renderCategories();
 renderProducts();
+if(frozen) setTimeout(openCart,300);
 });
 
-/* SEARCH */
-search.oninput=()=>{
-renderLimit=20;
-renderProducts();
-};
+search.oninput=()=>{renderLimit=20;renderProducts();};
 
 /* CATEGORIES */
 function renderCategories(){
 let cats=["All Products",...new Set(products.map(p=>p.cat))];
 categoryBar.innerHTML=cats.map(c=>
 `<button class="${c===currentCat?'active':''}"
-onclick="currentCat='${c}';renderLimit=20;renderCategories();renderProducts()">${c}</button>`
+onclick="currentCat='${c}';renderLimit=20;renderCategories();renderProducts();history.pushState({},'')">${c}</button>`
 ).join("");
 }
 
 /* PRODUCTS */
 function renderProducts(){
 let keys=search.value.toLowerCase().trim().split(/\s+/);
-
 let list=products.filter(p=>{
 let text=(p.name+" "+p.cat).toLowerCase();
 return keys.every(k=>text.includes(k)) &&
@@ -171,7 +204,6 @@ return keys.every(k=>text.includes(k)) &&
 productsDiv.innerHTML=list.slice(0,renderLimit).map(p=>{
 let qty=cart[p.name]||0;
 let discount=p.mrp>p.price?Math.round(((p.mrp-p.price)/p.mrp)*100):0;
-
 return `
 <div class="product" onclick="openProduct('${p.name}')">
 <img src="${p.imgs[0]}" loading="lazy">
@@ -192,8 +224,7 @@ updateCount();
 /* INFINITE SCROLL */
 window.addEventListener("scroll",()=>{
 if(innerHeight+scrollY>=document.body.offsetHeight-200){
-renderLimit+=20;
-renderProducts();
+renderLimit+=20;renderProducts();
 }
 });
 
@@ -204,8 +235,9 @@ let q=cart[name]||0;
 modal.innerHTML=`
 <div class="modalBox">
 <button onclick="history.back()">⬅ Back</button>
-<button onclick="shareProduct('${name}')">🔗 Share</button>
-<div class="gallery">${p.imgs.map(i=>`<img src="${i}" loading="lazy">`).join("")}</div>
+<div class="gallery">
+${p.imgs.map(i=>`<img src="${i}" loading="lazy">`).join("")}
+</div>
 <h3>${p.name}</h3>
 <p class="price">₹${p.price} <del>₹${p.mrp}</del></p>
 <p>${p.desc}</p>
@@ -217,7 +249,7 @@ modal.innerHTML=`
 </div>`;
 modal.style.display="block";
 modalOpen=true;
-history.pushState({},"");
+history.pushState({}, "");
 }
 
 /* CART */
@@ -225,7 +257,7 @@ function openCart(){
 renderCart();
 cartModal.style.display="block";
 cartOpen=true;
-history.pushState({},"");
+history.pushState({}, "");
 }
 
 function renderCart(){
@@ -238,17 +270,30 @@ ${Object.keys(cart).map(n=>{
 let p=products.find(x=>x.name===n);
 let t=p.price*cart[n]; total+=t;
 return `
-<div>
-<b>${n}</b> – ₹${p.price} × ${cart[n]} = ₹${t}
+<div class="cartItem">
+<img src="${p.imgs[0]}">
+<div style="flex:1">
+<b>${n}</b><br>₹${p.price} × ${cart[n]}
+<div class="qty">
+<button onclick="updateCart('${n}',-1)">−</button>
+<span>${cart[n]}</span>
+<button onclick="updateCart('${n}',1)">+</button>
+</div>
+</div>
+<b>₹${t}</b>
 </div>`;
 }).join("")}
 <hr>
-<h3>Total ₹${total}</h3>
+<h3 style="text-align:right">Total ₹${total}</h3>
+<button onclick="checkout()" style="width:100%;padding:14px;background:#25D366;color:#fff;border:none;border-radius:6px">
+Place Order on WhatsApp
+</button>
 </div>`;
 }
 
 /* CART UPDATE */
 function updateCart(n,v,stay){
+if(frozen) return;
 cart[n]=(cart[n]||0)+v;
 if(cart[n]<=0) delete cart[n];
 localStorage.setItem("cart",JSON.stringify(cart));
@@ -262,20 +307,32 @@ function updateCount(){
 cartCount.innerText=Object.values(cart).reduce((a,b)=>a+b,0);
 }
 
-/* SHARE */
-function shareProduct(name){
-navigator.share?.({
-title:name,
-text:"Check this on Agrima Mart",
-url:location.href
-})||showToast("Sharing not supported");
+/* CHECKOUT */
+function checkout(){
+const compressed=LZString.compressToEncodedURIComponent(JSON.stringify(cart));
+let msg="Hello Agrima Mart 👋%0A%0A🧾 Order Details%0A";
+let total=0;
+for(let n in cart){
+let p=products.find(x=>x.name===n);
+let t=p.price*cart[n]; total+=t;
+msg+=`• ${n} × ${cart[n]} = ₹${t}%0A`;
+}
+const link=`${location.origin}${location.pathname}?o=${compressed}`;
+msg+=`%0A💰 Total: ₹${total}%0A%0A📦 View Cart:%0A${link}`;
+window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
 }
 
-/* BACK BUTTON */
-history.pushState({},"");
+/* BACK BUTTON (FIXED PRIORITY) */
+let backCount=0;
 window.onpopstate=()=>{
 if(modalOpen){modal.style.display="none";modalOpen=false;return;}
 if(cartOpen){cartModal.style.display="none";cartOpen=false;return;}
+if(search.value!==""){search.value="";renderProducts();return;}
+if(currentCat!=="All Products"){
+currentCat="All Products";
+renderCategories();renderProducts();
+return;
+}
 backCount++;
 if(backCount===1){
 showToast("Press back again to exit");
@@ -300,6 +357,19 @@ search:search.value,
 scroll:scrollY
 }));
 });
+
+/* INSTALL BUTTON */
+let deferredPrompt;
+window.addEventListener("beforeinstallprompt",e=>{
+e.preventDefault();deferredPrompt=e;
+if(!matchMedia('(display-mode: standalone)').matches)
+installBtn.style.display="block";
+});
+installBtn.onclick=async()=>{
+deferredPrompt.prompt();
+await deferredPrompt.userChoice;
+installBtn.style.display="none";
+};
 
 /* SERVICE WORKER */
 if("serviceWorker" in navigator){
