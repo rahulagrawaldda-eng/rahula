@@ -86,14 +86,28 @@ body{margin:0;font-family:Arial}
 const phone="919929333794";
 const sheetURL="https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgUXWdE4/Sheet1";
 
+const productsDiv=document.getElementById("products");
+const installBtn=document.getElementById("installBtn");
+
 let products=[],cart=JSON.parse(localStorage.getItem("cart"))||{};
-let currentCat="All Products",selectedVariant={};
-let modalOpen=false,cartOpen=false,backCount=0;
+let currentCat="All Products",selectedVariant={},backCount=0;
+let modalOpen=false,cartOpen=false,frozen=false;
+
+/* SNAPSHOT */
+const qs=new URLSearchParams(location.search);
+if(qs.get("o")){
+cart=JSON.parse(LZString.decompressFromEncodedURIComponent(qs.get("o")));
+frozen=true;
+}
+
+/* INITIAL STATE */
+history.replaceState({home:true},"");
 
 /* LOAD */
 fetch(sheetURL).then(r=>r.json()).then(d=>{
 products=d.map(p=>{
-let mrp=+p.mrp,price=+p.offer||mrp;
+let mrp=+p.mrp;
+let price=+p.offer||mrp;
 return{
 name:p.name,
 cat:p.category||"Others",
@@ -104,7 +118,9 @@ imgs:p.images.split("|"),
 colors:(p.colors||"").split("|").filter(Boolean),
 sizes:(p.sizes||"").split("|").filter(Boolean)
 }});
-renderCategories();renderProducts();
+renderCategories();
+renderProducts();
+if(frozen) setTimeout(openCart,300);
 });
 
 search.oninput=()=>renderProducts();
@@ -112,17 +128,27 @@ search.oninput=()=>renderProducts();
 /* CATEGORY */
 function renderCategories(){
 let cats=["All Products",...new Set(products.map(p=>p.cat))];
-categoryBar.innerHTML=cats.map(c=>`<button class="${c===currentCat?'active':''}" onclick="selectCategory('${c}')">${c}</button>`).join("");
+categoryBar.innerHTML=cats.map(c=>`
+<button class="${c===currentCat?'active':''}"
+onclick="selectCategory('${c}')">${c}</button>`).join("");
 }
 function selectCategory(c){
-currentCat=c;renderCategories();renderProducts();
+currentCat=c;
+renderCategories();
+renderProducts();
 history.pushState({cat:true},"");
+}
+
+/* SEARCH */
+function match(p){
+return search.value.toLowerCase().split(/\s+/)
+.every(k=>(p.name+p.cat).toLowerCase().includes(k));
 }
 
 /* PRODUCTS */
 function renderProducts(){
-productsDiv=document.getElementById("products");
-productsDiv.innerHTML=products.filter(p=>(currentCat==="All Products"||p.cat===currentCat)&&match(p))
+productsDiv.innerHTML=products
+.filter(p=>(currentCat==="All Products"||p.cat===currentCat)&&match(p))
 .map(p=>{
 let qty=getQty(p.name);
 return`
@@ -140,9 +166,6 @@ return`
 }).join("");
 updateCount();
 }
-function match(p){
-return search.value.toLowerCase().split(/\s+/).every(k=>(p.name+p.cat).toLowerCase().includes(k));
-}
 
 /* PRODUCT MODAL */
 function openProduct(name){
@@ -157,13 +180,23 @@ modal.innerHTML=`
 <div class="price">₹${p.price} (${p.off}% OFF)</div>
 <p>${p.desc}</p>
 
-${p.colors.length?`<div class="colors">${p.colors.map(c=>`<div class="color" style="background:${c}" onclick="selectColor('${name}','${c}',this)"></div>`).join("")}</div>`:""}
-${p.sizes.length?`<div class="sizes">${p.sizes.map(s=>`<div class="size" onclick="selectSize('${name}','${s}',this)">${s}</div>`).join("")}</div>`:""}
+${p.colors.length?`
+<div class="colors">
+${p.colors.map(c=>`
+<div class="color" style="background:${c}"
+onclick="selectColor('${name}','${c}',this)"></div>`).join("")}
+</div>`:""}
+
+${p.sizes.length?`
+<div class="sizes">
+${p.sizes.map(s=>`
+<div class="size" onclick="selectSize('${name}','${s}',this)">${s}</div>`).join("")}
+</div>`:""}
 
 <div class="qty">
-<button onclick="updateCart('${name}',-1)">−</button>
-<span>${getQty(name)}</span>
-<button onclick="updateCart('${name}',1)">+</button>
+<button onclick="updateCart('${name}',-1,true)">−</button>
+<span id="modalQty">${getQty(name)}</span>
+<button onclick="updateCart('${name}',1,true)">+</button>
 </div>
 </div>`;
 modal.style.display="block";
@@ -185,19 +218,21 @@ e.classList.add('active');
 
 /* CART HELPERS */
 function getQty(name){
-return Object.keys(cart).filter(k=>k.startsWith(name)).reduce((a,k)=>a+cart[k],0);
+return Object.keys(cart).filter(k=>k.startsWith(name))
+.reduce((a,k)=>a+cart[k],0);
 }
 
 function addFromCard(name,v){
 let p=products.find(x=>x.name===name);
-if((p.colors.length||p.sizes.length)){
+if(p.colors.length||p.sizes.length){
 alert(p.colors.length?"Select color":"Select size");
 return;
 }
 updateCart(name,v);
 }
 
-function updateCart(name,v){
+function updateCart(name,v,fromModal){
+if(frozen){alert("This is a shared cart snapshot");return;}
 let p=products.find(x=>x.name===name);
 let key=name;
 if(p.colors.length||p.sizes.length){
@@ -210,6 +245,7 @@ cart[key]=(cart[key]||0)+v;
 if(cart[key]<=0) delete cart[key];
 localStorage.setItem("cart",JSON.stringify(cart));
 renderProducts();
+if(fromModal) document.getElementById("modalQty").innerText=getQty(name);
 if(cartOpen) renderCart();
 }
 
@@ -229,7 +265,8 @@ cartModal.innerHTML=`
 ${Object.keys(cart).map(k=>{
 let [n]=k.split(" | ");
 let p=products.find(x=>x.name===n);
-let t=p.price*cart[k]; total+=t;
+let t=p.price*cart[k];
+total+=t;
 return`
 <div class="cartItem">
 <img src="${p.imgs[0]}" class="cartImg">
@@ -251,10 +288,12 @@ return`
 }
 
 function updateCartKey(k,v){
+if(frozen) return;
 cart[k]+=v;
 if(cart[k]<=0) delete cart[k];
 localStorage.setItem("cart",JSON.stringify(cart));
-renderCart();renderProducts();
+renderCart();
+renderProducts();
 }
 
 function updateCount(){
@@ -263,25 +302,40 @@ cartCount.innerText=Object.values(cart).reduce((a,b)=>a+b,0);
 
 /* CHECKOUT */
 function checkout(){
+let comp=LZString.compressToEncodedURIComponent(JSON.stringify(cart));
 let msg="Order%0A";let total=0;
 for(let k in cart){
 let [n]=k.split(" | ");
 let p=products.find(x=>x.name===n);
-let t=p.price*cart[k]; total+=t;
+let t=p.price*cart[k];
+total+=t;
 msg+=`${k} × ${cart[k]} = ₹${t}%0A`;
 }
-msg+=`%0ATotal ₹${total}`;
+msg+=`%0ATotal ₹${total}%0A${location.origin}${location.pathname}?o=${comp}`;
 window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
-cart={};localStorage.removeItem("cart");
+
+if(!frozen){
+cart={};
+localStorage.removeItem("cart");
 renderProducts();
+}
 }
 
 /* BACK */
 window.onpopstate=()=>{
 if(modalOpen){modal.style.display="none";modalOpen=false;return;}
 if(cartOpen){cartModal.style.display="none";cartOpen=false;return;}
-if(currentCat!=="All Products"){currentCat="All Products";renderCategories();renderProducts();return;}
-if(search.value){search.value="";renderProducts();return;}
+if(currentCat!=="All Products"){
+currentCat="All Products";
+renderCategories();
+renderProducts();
+return;
+}
+if(search.value){
+search.value="";
+renderProducts();
+return;
+}
 backCount++;
 if(backCount===1){
 toast.innerText="Press back again to exit";
@@ -293,7 +347,8 @@ setTimeout(()=>{toast.style.display="none";backCount=0},2000);
 /* INSTALL */
 let deferredPrompt;
 window.addEventListener("beforeinstallprompt",e=>{
-e.preventDefault();deferredPrompt=e;
+e.preventDefault();
+deferredPrompt=e;
 installBtn.style.display="block";
 });
 installBtn.onclick=async()=>{
