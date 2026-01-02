@@ -1,15 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agrima Mart</title>
 
-<script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
-
 <style>
-body{margin:0;font-family:Arial;background:#fff}
-header{background:#25D366;color:#fff;padding:14px;font-size:18px}
+body{margin:0;font-family:Arial}
+header{background:#25D366;color:#fff;padding:12px;font-size:18px}
 #products{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:12px}
 .product{border:1px solid #ddd;border-radius:10px;padding:8px;cursor:pointer}
 .product img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px}
@@ -19,10 +17,10 @@ header{background:#25D366;color:#fff;padding:14px;font-size:18px}
 .modalBox{background:#fff;height:100%;overflow:auto;padding:14px}
 
 .gallery{display:flex;gap:10px;overflow-x:auto}
-.gallery img{width:100%;max-width:400px;border-radius:10px}
+.gallery img{width:100%;max-width:420px;border-radius:10px}
 
 .variant{margin:12px 0}
-.variantTitle{font-weight:bold;margin-bottom:6px}
+.variantTitle{font-weight:600;margin-bottom:6px}
 
 .sizeBtn{
   padding:6px 12px;border:1px solid #25D366;
@@ -38,26 +36,6 @@ header{background:#25D366;color:#fff;padding:14px;font-size:18px}
 }
 .colorDot.active{border:3px solid #25D366}
 .colorDot.disabled{opacity:.3;pointer-events:none}
-
-#cartBtn{
-  position:fixed;bottom:20px;right:20px;
-  background:#25D366;color:#fff;
-  width:60px;height:60px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:24px
-}
-#cartCount{
-  position:absolute;top:-6px;right:-6px;
-  background:red;color:#fff;border-radius:50%;
-  padding:4px 7px;font-size:12px
-}
-
-#toast{
-  position:fixed;bottom:30px;left:50%;
-  transform:translateX(-50%);
-  background:#333;color:#fff;
-  padding:10px 18px;border-radius:20px;display:none
-}
 </style>
 </head>
 
@@ -65,40 +43,25 @@ header{background:#25D366;color:#fff;padding:14px;font-size:18px}
 
 <header>Agrima Mart</header>
 <div id="products"></div>
-
-<div id="cartBtn">🛒<span id="cartCount">0</span></div>
 <div id="modal"></div>
-<div id="toast"></div>
 
 <script>
-const sheetURL = "https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgUXWdE4/Sheet1";
-const phone = "919929333794";
+const sheetURL="https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgUXWdE4/Sheet1";
+const phone="919929333794";
 
-let products=[], cart=JSON.parse(localStorage.getItem("cart"))||{};
-let selectedSize=null, selectedColor=null;
+let products=[];
+let selectedSize=null;
+let selectedColor=null;
+let currentProduct=null;
 
 const productsDiv=document.getElementById("products");
 const modal=document.getElementById("modal");
 
-function toast(t){
-  document.getElementById("toast").innerText=t;
-  document.getElementById("toast").style.display="block";
-  setTimeout(()=>toastBox.style.display="none",2000);
-}
-
 function parseStock(s){
   let m={}; if(!s) return m;
   s.split("|").forEach(x=>{
-    let [k,v]=x.split(":"); m[k]=+v;
-  });
-  return m;
-}
-
-function parseColorImages(s){
-  let m={}; if(!s) return m;
-  s.split("|").forEach(x=>{
-    let [c,imgs]=x.split("=");
-    if(c && imgs) m[c]=imgs.split("|");
+    let [k,v]=x.split(":");
+    m[k]=+v;
   });
   return m;
 }
@@ -108,7 +71,7 @@ function colorHex(c){
     blue:"#1e88e5",black:"#000",
     red:"#e53935",green:"#43a047",
     white:"#fff"
-  }[c.toLowerCase()]||"#999";
+  }[c.toLowerCase()] || "#999";
 }
 
 fetch(sheetURL).then(r=>r.json()).then(d=>{
@@ -120,96 +83,110 @@ products=d.map(p=>({
   imgs:p.images.split("|"),
   sizes:p.sizes?p.sizes.split("|"):[],
   colors:p.colors?p.colors.split("|"):[],
-  stock:p.stock||"",
-  colorImgs:p.color_images||""
+  stock:p.stock||""
 }));
-render();
+renderProducts();
 });
 
-function render(){
+function renderProducts(){
 productsDiv.innerHTML=products.map(p=>`
 <div class="product" onclick="openProduct('${p.name}')">
 <img src="${p.imgs[0]}">
 <h4>${p.name}</h4>
 <p class="price">₹${p.price}</p>
 </div>`).join("");
-updateCount();
 }
 
 function openProduct(name){
 const p=products.find(x=>x.name===name);
-selectedSize=null; selectedColor=null;
+currentProduct=name;
+selectedSize=null;
+selectedColor=null;
 
 const stock=parseStock(p.stock);
-const colorImgs=parseColorImages(p.colorImgs);
 
-modal.innerHTML=`
+let html=`
 <div class="modalBox">
 <button onclick="modal.style.display='none'">⬅ Back</button>
 
-<div class="gallery" id="gallery">
+<div class="gallery">
 ${p.imgs.map(i=>`<img src="${i}">`).join("")}
 </div>
 
 <h3>${p.name}</h3>
 <p>${p.desc}</p>
+`;
 
-${p.sizes.length?`
+if(p.sizes.length){
+html+=`
 <div class="variant">
 <div class="variantTitle">Size</div>
 ${p.sizes.map(s=>{
-const dis=p.colors.length
+const disabled=p.colors.length
 ? p.colors.every(c=>(stock[`${s}-${c}`]||0)<=0)
 : (stock[s]||0)<=0;
-return `<button class="sizeBtn ${dis?'disabled':''}"
+return `<button class="sizeBtn ${disabled?'disabled':''}"
 onclick="selectSize('${s}')">${s}</button>`;
 }).join("")}
-</div>`:""}
+</div>`;
+}
 
-${p.colors.length?`
+if(p.colors.length){
+html+=`
 <div class="variant">
 <div class="variantTitle">Color</div>
 <div class="colorRow">
 ${p.colors.map(c=>{
-const dis=selectedSize?(stock[`${selectedSize}-${c}`]||0)<=0:true;
-return `<div class="colorDot ${dis?'disabled':''}"
+const disabled=true;
+return `<div class="colorDot disabled"
 style="background:${colorHex(c)}"
-onclick="selectColor('${c}','${p.name}')"></div>`;
+data-color="${c}"
+onclick="selectColor('${c}')"></div>`;
 }).join("")}
-</div></div>`:""}
-
-<button style="width:100%;padding:14px;background:#25D366;color:#fff;border:none;border-radius:6px"
-onclick="addToCart('${p.name}')">Add to Cart</button>
+</div>
 </div>`;
+}
+
+html+=`
+<button style="width:100%;padding:14px;background:#25D366;color:#fff;border:none;border-radius:6px"
+onclick="addToCart()">Add to Cart</button>
+</div>`;
+
+modal.innerHTML=html;
 modal.style.display="block";
 }
 
-function selectSize(s){selectedSize=s}
+function selectSize(s){
+selectedSize=s;
+document.querySelectorAll(".sizeBtn").forEach(b=>b.classList.remove("active"));
+event.target.classList.add("active");
 
-function selectColor(c,name){
+const p=products.find(x=>x.name===currentProduct);
+const stock=parseStock(p.stock);
+
+document.querySelectorAll(".colorDot").forEach(d=>{
+const c=d.dataset.color;
+const available=(stock[`${s}-${c}`]||0)>0;
+d.classList.toggle("disabled",!available);
+});
+}
+
+function selectColor(c){
+if(event.target.classList.contains("disabled")) return;
 selectedColor=c;
-const p=products.find(x=>x.name===name);
-const map=parseColorImages(p.colorImgs);
-const imgs=map[c]||p.imgs;
-document.getElementById("gallery").innerHTML=imgs.map(i=>`<img src="${i}">`).join("");
+document.querySelectorAll(".colorDot").forEach(d=>d.classList.remove("active"));
+event.target.classList.add("active");
 }
 
-function addToCart(name){
-const p=products.find(x=>x.name===name);
-if(p.sizes.length&&!selectedSize){alert("Select size");return;}
-if(p.colors.length&&!selectedColor){alert("Select color");return;}
+function addToCart(){
+const p=products.find(x=>x.name===currentProduct);
+if(p.sizes.length && !selectedSize){alert("Select size");return;}
+if(p.colors.length && !selectedColor){alert("Select color");return;}
 
-const key=`${name} (${selectedSize||""}${selectedColor?", "+selectedColor:""})`;
-cart[key]=(cart[key]||0)+1;
-localStorage.setItem("cart",JSON.stringify(cart));
-updateCount();
-alert("Added to cart");
-}
-
-function updateCount(){
-document.getElementById("cartCount").innerText=
-Object.values(cart).reduce((a,b)=>a+b,0);
+const text=`Hello Agrima Mart%0A${p.name} (${selectedSize||""}${selectedColor?", "+selectedColor:""})`;
+window.open(`https://wa.me/${phone}?text=${text}`,"_blank");
 }
 </script>
+
 </body>
 </html>
