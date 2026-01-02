@@ -24,10 +24,13 @@ body{margin:0;font-family:Arial}
 @media(max-width:600px){#products{grid-template-columns:repeat(2,1fr)}}
 @media(min-width:601px){#products{grid-template-columns:repeat(5,1fr)}}
 
-.product{border:1px solid #ddd;border-radius:10px;padding:8px}
+.product{border:1px solid #ddd;border-radius:10px;padding:8px;cursor:pointer}
 .product img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px}
 
 .price{color:#2e7d32;font-weight:bold}
+.mrp{text-decoration:line-through;color:#777;font-size:13px}
+.off{color:#d32f2f;font-size:13px}
+
 .qty{display:flex;justify-content:center;gap:12px;margin-top:6px}
 .qty button{padding:6px 14px;background:#25D366;color:#fff;border:none;border-radius:6px}
 
@@ -44,24 +47,14 @@ body{margin:0;font-family:Arial}
 
 .colors{display:flex;gap:8px;margin:10px 0}
 .color{width:24px;height:24px;border-radius:50%;border:2px solid #ccc}
-.color.active{
-border:3px solid #000;
-box-shadow:0 0 0 3px #25D366;
-transform:scale(1.15);
-}
-.cartImg{
-  width:52px;
-  height:52px;
-  object-fit:cover;
-  border-radius:6px;
-  border:1px solid #ddd;
-}
+.color.active{border:3px solid #000;box-shadow:0 0 0 3px #25D366;transform:scale(1.15)}
 
 .sizes{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
 .size{padding:6px 12px;border:1px solid #888;border-radius:6px}
 .size.active{background:#25D366;color:#fff;border:none}
 
-.cartItem{display:flex;gap:10px;border-bottom:1px solid #ddd;padding:8px 0}
+.cartItem{display:flex;gap:10px;border-bottom:1px solid #ddd;padding:8px 0;align-items:center}
+.cartImg{width:52px;height:52px;object-fit:cover;border-radius:6px;border:1px solid #ddd}
 
 #toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 18px;border-radius:20px;display:none}
 </style>
@@ -93,105 +86,90 @@ transform:scale(1.15);
 const phone="919929333794";
 const sheetURL="https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgUXWdE4/Sheet1";
 
-const productsDiv=document.getElementById("products");
-const installBtn=document.getElementById("installBtn");
-
 let products=[],cart=JSON.parse(localStorage.getItem("cart"))||{};
 let currentCat="All Products",selectedVariant={},backCount=0;
-let modalOpen=false,cartOpen=false,frozen=false;
-
-/* SNAPSHOT */
-const qs=new URLSearchParams(location.search);
-if(qs.get("o")){
-cart=JSON.parse(LZString.decompressFromEncodedURIComponent(qs.get("o")));
-frozen=true;
-}
+let modalOpen=false,cartOpen=false;
 
 /* LOAD */
 fetch(sheetURL).then(r=>r.json()).then(d=>{
-products=d.map(p=>({
+products=d.map(p=>{
+let mrp=+p.mrp;
+let price=+p.offer||mrp;
+return{
 name:p.name,
 cat:p.category||"Others",
-price:+p.offer||+p.mrp,
+mrp,price,
+off:mrp?Math.round((mrp-price)/mrp*100):0,
 desc:p.description||"",
 imgs:p.images.split("|"),
 colors:(p.colors||"").split("|").filter(Boolean),
 sizes:(p.sizes||"").split("|").filter(Boolean)
-}));
-renderCategories();
-renderProducts();
-if(frozen) setTimeout(openCart,300);
+}});
+renderCategories();renderProducts();
 });
 
 search.oninput=()=>renderProducts();
 
-/* SMART SEARCH */
-function match(p){
-return search.value.toLowerCase().split(/\s+/).every(k=>
-(p.name+p.cat).toLowerCase().includes(k));
-}
-
 /* CATEGORY */
 function renderCategories(){
 let cats=["All Products",...new Set(products.map(p=>p.cat))];
-categoryBar.innerHTML=cats.map(c=>`
-<button class="${c===currentCat?'active':''}"
-onclick="selectCategory('${c}')">${c}</button>`).join("");
+categoryBar.innerHTML=cats.map(c=>`<button class="${c===currentCat?'active':''}" onclick="selectCategory('${c}')">${c}</button>`).join("");
 }
 function selectCategory(c){
-if(c!==currentCat) history.pushState({cat:true},"");
-currentCat=c;
-renderCategories();
-renderProducts();
-backCount=0;
+currentCat=c;renderCategories();renderProducts();backCount=0;
 }
 
 /* PRODUCTS */
 function renderProducts(){
-productsDiv.innerHTML=products.filter(p=>
-(currentCat==="All Products"||p.cat===currentCat)&&match(p)
-).map(p=>{
+products.innerHTML=products;
+document.getElementById("products").innerHTML=
+products.filter(p=>(currentCat==="All Products"||p.cat===currentCat)&&match(p))
+.map(p=>{
 let qty=Object.keys(cart).filter(k=>k.startsWith(p.name)).reduce((a,k)=>a+cart[k],0);
-return `
+return`
 <div class="product" onclick="openProduct('${p.name}')">
 <img src="${p.imgs[0]}">
 <h4>${p.name}</h4>
-<p class="price">₹${p.price}</p>
+<div class="mrp">₹${p.mrp}</div>
+<div class="price">₹${p.price} <span class="off">${p.off}% OFF</span></div>
 <div class="qty" onclick="event.stopPropagation()">
-<button onclick="updateCart('${p.name}',-1)">−</button>
+<button onclick="cardAdd('${p.name}',-1)">−</button>
 <span>${qty}</span>
-<button onclick="updateCart('${p.name}',1)">+</button>
+<button onclick="cardAdd('${p.name}',1)">+</button>
 </div>
 </div>`;
 }).join("");
 updateCount();
 }
+function match(p){
+return search.value.toLowerCase().split(/\s+/).every(k=>(p.name+p.cat).toLowerCase().includes(k));
+}
+
+/* CARD ADD (PRE-CHECK VARIANT) */
+function cardAdd(name,v){
+let p=products.find(x=>x.name===name);
+if((p.colors.length||p.sizes.length)&&!selectedVariant[name]){
+alert(p.colors.length?"Select color":"Select size");
+return;
+}
+updateCart(name,v,true);
+}
 
 /* PRODUCT MODAL */
 function openProduct(name){
-backCount=0;
-let p=products.find(x=>x.name===name);
 selectedVariant[name]={};
-
+let p=products.find(x=>x.name===name);
 modal.innerHTML=`
 <div class="modalBox">
 <button onclick="history.back()">⬅ Back</button>
 <div class="gallery">${p.imgs.map(i=>`<img src="${i}">`).join("")}</div>
 <h3>${p.name}</h3>
+<p class="mrp">₹${p.mrp}</p>
+<p class="price">₹${p.price} (${p.off}% OFF)</p>
 <p>${p.desc}</p>
 
-${p.colors.length?`
-<div class="colors">
-${p.colors.map(c=>`
-<div class="color" style="background:${c}"
-onclick="selectColor('${name}','${c}',this)"></div>`).join("")}
-</div>`:""}
-
-${p.sizes.length?`
-<div class="sizes">
-${p.sizes.map(s=>`
-<div class="size" onclick="selectSize('${name}','${s}',this)">${s}</div>`).join("")}
-</div>`:""}
+${p.colors.length?`<div class="colors">${p.colors.map(c=>`<div class="color" style="background:${c}" onclick="selectColor('${name}','${c}',this)"></div>`).join("")}</div>`:""}
+${p.sizes.length?`<div class="sizes">${p.sizes.map(s=>`<div class="size" onclick="selectSize('${name}','${s}',this)">${s}</div>`).join("")}</div>`:""}
 
 <div class="qty">
 <button onclick="updateCart('${name}',-1,true)">−</button>
@@ -199,19 +177,18 @@ ${p.sizes.map(s=>`
 <button onclick="updateCart('${name}',1,true)">+</button>
 </div>
 </div>`;
-modal.style.display="block";
-modalOpen=true;
+modal.style.display="block";modalOpen=true;
 history.pushState({product:true},"");
 }
 
 /* VARIANTS */
 function selectColor(n,c,e){
-selectedVariant[n].color=c;
+selectedVariant[n]={...selectedVariant[n],color:c};
 e.parentNode.querySelectorAll('.color').forEach(x=>x.classList.remove('active'));
 e.classList.add('active');
 }
 function selectSize(n,s,e){
-selectedVariant[n].size=s;
+selectedVariant[n]={...selectedVariant[n],size:s};
 e.parentNode.querySelectorAll('.size').forEach(x=>x.classList.remove('active'));
 e.classList.add('active');
 }
@@ -219,138 +196,24 @@ function getQty(n){
 return Object.keys(cart).filter(k=>k.startsWith(n)).reduce((a,k)=>a+cart[k],0);
 }
 
-/* CART */
-function updateCart(name,v,stay){
-if(frozen){alert("This is a shared cart snapshot");return;}
+/* CART LOGIC */
+function updateCart(name,v){
 let p=products.find(x=>x.name===name);
 let key=name;
-
 if(p.colors.length||p.sizes.length){
 let sv=selectedVariant[name];
-if(p.colors.length&&!sv.color) return alert("Select color");
-if(p.sizes.length&&!sv.size) return alert("Select size");
+if(p.colors.length&&!sv?.color) return alert("Select color");
+if(p.sizes.length&&!sv?.size) return alert("Select size");
 key=`${name} | ${sv.size||""} | ${sv.color||""}`;
 }
 cart[key]=(cart[key]||0)+v;
 if(cart[key]<=0) delete cart[key];
 localStorage.setItem("cart",JSON.stringify(cart));
-
 renderProducts();
-if(stay) openProduct(name);
-if(cartOpen) renderCart();
 }
-
-function updateCartKey(key,v){
-if(frozen) return;
-cart[key]+=v;
-if(cart[key]<=0) delete cart[key];
-localStorage.setItem("cart",JSON.stringify(cart));
-renderProducts();
-renderCart();
-}
-
-function openCart(){
-backCount=0;
-renderCart();
-cartModal.style.display="block";
-cartOpen=true;
-history.pushState({cart:true},"");
-}
-
-function renderCart(){
-let total=0;
-cartModal.innerHTML=`
-<div class="modalBox">
-<button onclick="history.back()">⬅ Back</button>
-${Object.keys(cart).map(k=>{
-let [n]=k.split(" | ");
-let p=products.find(x=>x.name===n);
-let t=p.price*cart[k];
-total+=t;
-return `
-<div class="cartItem">
-<img src="${p.imgs[0]}" class="cartImg">
-
-<div style="flex:1">
-<b>${k}</b>
-<div>${cart[k]} × ₹${p.price} = ₹${t}</div>
-<div class="qty">
-<button onclick="updateCartKey('${k}',-1)">−</button>
-<span>${cart[k]}</span>
-<button onclick="updateCartKey('${k}',1)">+</button>
-</div>
-</div>
-<b>₹${t}</b>
-</div>`;
-}).join("")}
-<h3>Total ₹${total}</h3>
-<button onclick="checkout()" style="width:100%;padding:14px;background:#25D366;color:#fff;border:none">Place Order</button>
-</div>`;
-}
-
 function updateCount(){
 cartCount.innerText=Object.values(cart).reduce((a,b)=>a+b,0);
 }
-
-/* CHECKOUT */
-function checkout(){
-let comp=LZString.compressToEncodedURIComponent(JSON.stringify(cart));
-let msg="Order%0A";
-let total=0;
-for(let k in cart){
-let [n]=k.split(" | ");
-let p=products.find(x=>x.name===n);
-let t=p.price*cart[k];
-total+=t;
-msg+=`${k} × ${cart[k]} = ₹${t}%0A`;
-}
-msg+=`%0ATotal ₹${total}%0A${location.origin}${location.pathname}?o=${encodeURIComponent(comp)}`;
-window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
-
-if(!frozen){
-cart={};
-localStorage.removeItem("cart");
-renderProducts();
-}
-}
-
-/* BACK */
-window.onpopstate=()=>{
-if(modalOpen){modal.style.display="none";modalOpen=false;return;}
-if(cartOpen){cartModal.style.display="none";cartOpen=false;return;}
-if(currentCat!=="All Products"){
-currentCat="All Products";
-renderCategories();
-renderProducts();
-return;
-}
-if(search.value){
-search.value="";
-renderProducts();
-return;
-}
-backCount++;
-if(backCount===1){
-toast.innerText="Press back again to exit";
-toast.style.display="block";
-setTimeout(()=>{toast.style.display="none";backCount=0},2000);
-}else{
-window.close();
-}
-};
-
-/* INSTALL */
-let deferredPrompt;
-window.addEventListener("beforeinstallprompt",e=>{
-e.preventDefault();
-deferredPrompt=e;
-installBtn.style.display="block";
-});
-installBtn.onclick=async()=>{
-deferredPrompt.prompt();
-await deferredPrompt.userChoice;
-installBtn.style.display="none";
-};
 </script>
 
 </body>
