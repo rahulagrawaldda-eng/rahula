@@ -15,7 +15,7 @@ body{margin:0;font-family:Arial}
 .headerSocial{display:flex;gap:10px}
 .headerSocial img{width:26px;height:26px}
 
-#search{width:94%;margin:10px auto;padding:10px;display:block}
+#search{width:94%;margin:10px auto;padding:10px}
 #categoryBar{display:flex;gap:8px;overflow-x:auto;padding:8px;background:#eee}
 #categoryBar button{border:none;border-radius:20px;padding:8px 14px}
 #categoryBar .active{background:#25D366;color:#fff}
@@ -29,7 +29,7 @@ body{margin:0;font-family:Arial}
 
 .price{color:#2e7d32;font-weight:bold}
 .qty{display:flex;justify-content:center;gap:12px;margin-top:6px}
-.qty button{padding:6px 14px;border:none;background:#25D366;color:#fff;border-radius:6px}
+.qty button{padding:6px 14px;background:#25D366;color:#fff;border:none;border-radius:6px}
 
 #cartBtn{position:fixed;bottom:22px;right:22px;width:64px;height:64px;border-radius:50%;background:#25D366;color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;z-index:200}
 #cartCount{position:absolute;top:-6px;right:-6px;background:red;color:#fff;border-radius:50%;padding:4px 8px;font-size:13px}
@@ -37,8 +37,8 @@ body{margin:0;font-family:Arial}
 #modal,#cartModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999}
 .modalBox{background:#fff;height:100%;overflow:auto;padding:14px}
 
-.gallery{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory}
-.gallery img{width:90vw;max-width:420px;object-fit:contain;flex-shrink:0;scroll-snap-align:center;background:#f5f5f5;border-radius:10px}
+.gallery{display:flex;gap:10px;overflow-x:auto}
+.gallery img{width:90vw;max-width:420px;object-fit:contain;background:#f5f5f5;border-radius:10px}
 
 .colors{display:flex;gap:8px;margin:10px 0}
 .color{width:24px;height:24px;border-radius:50%;border:2px solid #ccc}
@@ -49,9 +49,7 @@ body{margin:0;font-family:Arial}
 .size.active{background:#25D366;color:#fff;border:none}
 
 .cartItem{display:flex;gap:10px;border-bottom:1px solid #ddd;padding:8px 0}
-.cartItem img{width:50px;height:50px;border-radius:6px}
 
-#installBtn{position:fixed;bottom:100px;right:22px;padding:14px 18px;border-radius:30px;background:#000;color:#fff;border:none;display:none;z-index:300}
 #toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 18px;border-radius:20px;display:none}
 </style>
 </head>
@@ -72,7 +70,6 @@ body{margin:0;font-family:Arial}
 <div id="products"></div>
 
 <div id="cartBtn" onclick="openCart()">🛒<span id="cartCount">0</span></div>
-<button id="installBtn">📲 Install Agrima Mart</button>
 
 <div id="modal"></div>
 <div id="cartModal"></div>
@@ -83,6 +80,7 @@ const phone="919929333794";
 const sheetURL="https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgUXWdE4/Sheet1";
 
 const productsDiv=document.getElementById("products");
+
 let products=[],cart=JSON.parse(localStorage.getItem("cart"))||{};
 let currentCat="All Products",selectedVariant={},backCount=0;
 let modalOpen=false,cartOpen=false,frozen=false;
@@ -105,7 +103,8 @@ imgs:p.images.split("|"),
 colors:(p.colors||"").split("|").filter(Boolean),
 sizes:(p.sizes||"").split("|").filter(Boolean)
 }));
-renderCategories();renderProducts();
+renderCategories();
+renderProducts();
 if(frozen) setTimeout(openCart,300);
 });
 
@@ -120,8 +119,17 @@ return search.value.toLowerCase().split(/\s+/).every(k=>
 /* CATEGORY */
 function renderCategories(){
 let cats=["All Products",...new Set(products.map(p=>p.cat))];
-categoryBar.innerHTML=cats.map(c=>`<button class="${c===currentCat?'active':''}"
-onclick="currentCat='${c}';renderCategories();renderProducts()">${c}</button>`).join("");
+categoryBar.innerHTML=cats.map(c=>`
+<button class="${c===currentCat?'active':''}"
+onclick="selectCategory('${c}')">${c}</button>`).join("");
+}
+
+function selectCategory(c){
+if(c!==currentCat) history.pushState({cat:true},"");
+currentCat=c;
+renderCategories();
+renderProducts();
+backCount=0;
 }
 
 /* PRODUCTS */
@@ -130,7 +138,8 @@ productsDiv.innerHTML=products.filter(p=>
 (currentCat==="All Products"||p.cat===currentCat)&&match(p)
 ).map(p=>{
 let qty=Object.keys(cart).filter(k=>k.startsWith(p.name)).reduce((a,k)=>a+cart[k],0);
-return `<div class="product" onclick="openProduct('${p.name}')">
+return `
+<div class="product" onclick="openProduct('${p.name}')">
 <img src="${p.imgs[0]}">
 <h4>${p.name}</h4>
 <p class="price">₹${p.price}</p>
@@ -138,118 +147,196 @@ return `<div class="product" onclick="openProduct('${p.name}')">
 <button onclick="updateCart('${p.name}',-1)">−</button>
 <span>${qty}</span>
 <button onclick="updateCart('${p.name}',1)">+</button>
-</div></div>`;
+</div>
+</div>`;
 }).join("");
 updateCount();
 }
 
-/* PRODUCT */
+/* PRODUCT MODAL */
 function openProduct(name){
 backCount=0;
 let p=products.find(x=>x.name===name);
 selectedVariant[name]={};
-modal.innerHTML=`<div class="modalBox">
+
+modal.innerHTML=`
+<div class="modalBox">
 <button onclick="history.back()">⬅ Back</button>
-<div class="gallery">${p.imgs.map(i=>`<img src="${i}">`).join("")}</div>
-<h3>${p.name}</h3><p>${p.desc}</p>
-${p.colors.length?`<div class="colors">${p.colors.map(c=>`<div class="color" style="background:${c}" onclick="selectColor('${name}','${c}',this)"></div>`).join("")}</div>`:""}
-${p.sizes.length?`<div class="sizes">${p.sizes.map(s=>`<div class="size" onclick="selectSize('${name}','${s}',this)">${s}</div>`).join("")}</div>`:""}
+
+<div class="gallery">
+${p.imgs.map(i=>`<img src="${i}">`).join("")}
+</div>
+
+<h3>${p.name}</h3>
+<p>${p.desc}</p>
+
+${p.colors.length?`
+<div class="colors">
+${p.colors.map(c=>`
+<div class="color" style="background:${c}"
+onclick="selectColor('${name}','${c}',this)"></div>`).join("")}
+</div>`:""}
+
+${p.sizes.length?`
+<div class="sizes">
+${p.sizes.map(s=>`
+<div class="size" onclick="selectSize('${name}','${s}',this)">${s}</div>`).join("")}
+</div>`:""}
+
 <div class="qty">
 <button onclick="updateCart('${name}',-1,true)">−</button>
 <span>${getQty(name)}</span>
 <button onclick="updateCart('${name}',1,true)">+</button>
-</div></div>`;
-modal.style.display="block";modalOpen=true;history.pushState({}, "");
+</div>
+</div>`;
+
+modal.style.display="block";
+modalOpen=true;
+history.pushState({product:true},"");
 }
 
-/* VARIANTS */
-function selectColor(n,c,e){selectedVariant[n].color=c;e.parentNode.querySelectorAll('.color').forEach(x=>x.classList.remove('active'));e.classList.add('active')}
-function selectSize(n,s,e){selectedVariant[n].size=s;e.parentNode.querySelectorAll('.size').forEach(x=>x.classList.remove('active'));e.classList.add('active')}
-function getQty(n){return Object.keys(cart).filter(k=>k.startsWith(n)).reduce((a,k)=>a+cart[k],0)}
+/* VARIANT SELECT */
+function selectColor(n,c,e){
+selectedVariant[n].color=c;
+e.parentNode.querySelectorAll('.color').forEach(x=>x.classList.remove('active'));
+e.classList.add('active');
+}
+function selectSize(n,s,e){
+selectedVariant[n].size=s;
+e.parentNode.querySelectorAll('.size').forEach(x=>x.classList.remove('active'));
+e.classList.add('active');
+}
+function getQty(n){
+return Object.keys(cart).filter(k=>k.startsWith(n)).reduce((a,k)=>a+cart[k],0);
+}
 
 /* CART */
 function updateCart(name,v,stay){
 if(frozen){alert("This is a shared cart snapshot");return;}
 let p=products.find(x=>x.name===name);
 let key=name;
+
 if(p.colors.length||p.sizes.length){
 let sv=selectedVariant[name];
-if(p.colors.length&&!sv.color)return alert("Select color");
-if(p.sizes.length&&!sv.size)return alert("Select size");
+if(p.colors.length&&!sv.color) return alert("Select color");
+if(p.sizes.length&&!sv.size) return alert("Select size");
 key=`${name} | ${sv.size||""} | ${sv.color||""}`;
 }
+
 cart[key]=(cart[key]||0)+v;
 if(cart[key]<=0) delete cart[key];
 localStorage.setItem("cart",JSON.stringify(cart));
-renderProducts();if(stay)openProduct(name);if(cartOpen)renderCart();
+
+renderProducts();
+if(stay) openProduct(name);
+if(cartOpen) renderCart();
 }
 
 function updateCartKey(key,v){
-if(frozen)return;
+if(frozen) return;
 cart[key]+=v;
 if(cart[key]<=0) delete cart[key];
 localStorage.setItem("cart",JSON.stringify(cart));
-renderProducts();renderCart();
+renderProducts();
+renderCart();
 }
 
-function openCart(){backCount=0;renderCart();cartModal.style.display="block";cartOpen=true;history.pushState({}, "")}
+function openCart(){
+backCount=0;
+renderCart();
+cartModal.style.display="block";
+cartOpen=true;
+history.pushState({cart:true},"");
+}
 
 function renderCart(){
 let total=0;
-cartModal.innerHTML=`<div class="modalBox">
+cartModal.innerHTML=`
+<div class="modalBox">
 <button onclick="history.back()">⬅ Back</button>
 ${Object.keys(cart).map(k=>{
-let [n]=k.split(" | ");let p=products.find(x=>x.name===n);
-let t=p.price*cart[k];total+=t;
-return `<div class="cartItem">
-<img src="${p.imgs[0]}">
-<div style="flex:1"><b>${k}</b>
+let [n]=k.split(" | ");
+let p=products.find(x=>x.name===n);
+let t=p.price*cart[k];
+total+=t;
+return `
+<div class="cartItem">
+<div style="flex:1">
+<b>${k}</b>
 <div>${cart[k]} × ₹${p.price} = ₹${t}</div>
 <div class="qty">
 <button onclick="updateCartKey('${k}',-1)">−</button>
 <span>${cart[k]}</span>
 <button onclick="updateCartKey('${k}',1)">+</button>
-</div></div><b>₹${t}</b></div>`;
+</div>
+</div>
+<b>₹${t}</b>
+</div>`;
 }).join("")}
 <h3>Total ₹${total}</h3>
 <button onclick="checkout()" style="width:100%;padding:14px;background:#25D366;color:#fff;border:none">Place Order</button>
 </div>`;
 }
 
-function updateCount(){cartCount.innerText=Object.values(cart).reduce((a,b)=>a+b,0)}
+function updateCount(){
+cartCount.innerText=Object.values(cart).reduce((a,b)=>a+b,0);
+}
 
+/* CHECKOUT */
 function checkout(){
 let comp=LZString.compressToEncodedURIComponent(JSON.stringify(cart));
-let msg="Order%0A";let total=0;
+let msg="Order%0A";
+let total=0;
 for(let k in cart){
-let [n]=k.split(" | ");let p=products.find(x=>x.name===n);
-let t=p.price*cart[k];total+=t;
+let [n]=k.split(" | ");
+let p=products.find(x=>x.name===n);
+let t=p.price*cart[k];
+total+=t;
 msg+=`${k} × ${cart[k]} = ₹${t}%0A`;
 }
-msg+=`%0ATotal ₹${total}%0A${location.origin}${location.pathname}?o=${comp}`;
+msg+=`%0ATotal ₹${total}%0A${location.origin}${location.pathname}?o=${encodeURIComponent(comp)}`;
 window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
+
+if(!frozen){
+cart={};
+localStorage.removeItem("cart");
+renderProducts();
+}
 }
 
 /* BACK */
 window.onpopstate=()=>{
-if(modalOpen){modal.style.display="none";modalOpen=false;return;}
-if(cartOpen){cartModal.style.display="none";cartOpen=false;return;}
-if(search.value){search.value="";renderProducts();return;}
+if(modalOpen){
+modal.style.display="none";
+modalOpen=false;
+return;
+}
+if(cartOpen){
+cartModal.style.display="none";
+cartOpen=false;
+return;
+}
+if(currentCat!=="All Products"){
+currentCat="All Products";
+renderCategories();
+renderProducts();
+return;
+}
+if(search.value){
+search.value="";
+renderProducts();
+return;
+}
 backCount++;
-if(backCount===1){toast.innerText="Press back again to exit";toast.style.display="block";setTimeout(()=>{toast.style.display="none";backCount=0},2000)}
-else window.close();
-};
-
-/* INSTALL */
-let deferredPrompt;
-window.addEventListener("beforeinstallprompt",e=>{
-e.preventDefault();deferredPrompt=e;installBtn.style.display="block";
-});
-installBtn.onclick=async()=>{
-deferredPrompt.prompt();
-await deferredPrompt.userChoice;
-installBtn.style.display="none";
+if(backCount===1){
+toast.innerText="Press back again to exit";
+toast.style.display="block";
+setTimeout(()=>{toast.style.display="none";backCount=0},2000);
+}else{
+window.close();
+}
 };
 </script>
+
 </body>
 </html>
