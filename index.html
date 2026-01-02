@@ -34,13 +34,7 @@ body{margin:0;font-family:Arial}
 #cartBtn{position:fixed;bottom:22px;right:22px;width:64px;height:64px;border-radius:50%;background:#25D366;color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;z-index:200}
 #cartCount{position:absolute;top:-6px;right:-6px;background:red;color:#fff;border-radius:50%;padding:4px 8px;font-size:13px}
 
-<button id="installBtn"
-style="position:fixed;bottom:100px;right:22px;
-padding:14px 18px;border-radius:30px;
-background:#000;color:#fff;border:none;
-display:none;z-index:300">
-📲 Install Agrima Mart
-</button>
+#installBtn{position:fixed;bottom:100px;right:22px;padding:14px 18px;border-radius:30px;background:#000;color:#fff;border:none;display:none;z-index:300}
 
 #modal,#cartModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999}
 .modalBox{background:#fff;height:100%;overflow:auto;padding:14px}
@@ -51,10 +45,11 @@ display:none;z-index:300">
 .colors{display:flex;gap:8px;margin:10px 0}
 .color{width:24px;height:24px;border-radius:50%;border:2px solid #ccc}
 .color.active{
-  border:3px solid #000;
-  box-shadow:0 0 0 3px #25D366;
-  transform:scale(1.15);
+border:3px solid #000;
+box-shadow:0 0 0 3px #25D366;
+transform:scale(1.15);
 }
+
 .sizes{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
 .size{padding:6px 12px;border:1px solid #888;border-radius:6px}
 .size.active{background:#25D366;color:#fff;border:none}
@@ -81,6 +76,7 @@ display:none;z-index:300">
 <div id="products"></div>
 
 <div id="cartBtn" onclick="openCart()">🛒<span id="cartCount">0</span></div>
+<button id="installBtn">📲 Install Agrima Mart</button>
 
 <div id="modal"></div>
 <div id="cartModal"></div>
@@ -91,6 +87,7 @@ const phone="919929333794";
 const sheetURL="https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgUXWdE4/Sheet1";
 
 const productsDiv=document.getElementById("products");
+const installBtn=document.getElementById("installBtn");
 
 let products=[],cart=JSON.parse(localStorage.getItem("cart"))||{};
 let currentCat="All Products",selectedVariant={},backCount=0;
@@ -134,7 +131,6 @@ categoryBar.innerHTML=cats.map(c=>`
 <button class="${c===currentCat?'active':''}"
 onclick="selectCategory('${c}')">${c}</button>`).join("");
 }
-
 function selectCategory(c){
 if(c!==currentCat) history.pushState({cat:true},"");
 currentCat=c;
@@ -173,11 +169,7 @@ selectedVariant[name]={};
 modal.innerHTML=`
 <div class="modalBox">
 <button onclick="history.back()">⬅ Back</button>
-
-<div class="gallery">
-${p.imgs.map(i=>`<img src="${i}">`).join("")}
-</div>
-
+<div class="gallery">${p.imgs.map(i=>`<img src="${i}">`).join("")}</div>
 <h3>${p.name}</h3>
 <p>${p.desc}</p>
 
@@ -200,13 +192,12 @@ ${p.sizes.map(s=>`
 <button onclick="updateCart('${name}',1,true)">+</button>
 </div>
 </div>`;
-
 modal.style.display="block";
 modalOpen=true;
 history.pushState({product:true},"");
 }
 
-/* VARIANT SELECT */
+/* VARIANTS */
 function selectColor(n,c,e){
 selectedVariant[n].color=c;
 e.parentNode.querySelectorAll('.color').forEach(x=>x.classList.remove('active'));
@@ -233,7 +224,6 @@ if(p.colors.length&&!sv.color) return alert("Select color");
 if(p.sizes.length&&!sv.size) return alert("Select size");
 key=`${name} | ${sv.size||""} | ${sv.color||""}`;
 }
-
 cart[key]=(cart[key]||0)+v;
 if(cart[key]<=0) delete cart[key];
 localStorage.setItem("cart",JSON.stringify(cart));
@@ -317,16 +307,8 @@ renderProducts();
 
 /* BACK */
 window.onpopstate=()=>{
-if(modalOpen){
-modal.style.display="none";
-modalOpen=false;
-return;
-}
-if(cartOpen){
-cartModal.style.display="none";
-cartOpen=false;
-return;
-}
+if(modalOpen){modal.style.display="none";modalOpen=false;return;}
+if(cartOpen){cartModal.style.display="none";cartOpen=false;return;}
 if(currentCat!=="All Products"){
 currentCat="All Products";
 renderCategories();
@@ -347,19 +329,18 @@ setTimeout(()=>{toast.style.display="none";backCount=0},2000);
 window.close();
 }
 };
+
+/* INSTALL */
 let deferredPrompt;
-const installBtn = document.getElementById("installBtn");
-
-window.addEventListener("beforeinstallprompt", e => {
-  e.preventDefault();
-  deferredPrompt = e;
-  installBtn.style.display = "block";
+window.addEventListener("beforeinstallprompt",e=>{
+e.preventDefault();
+deferredPrompt=e;
+installBtn.style.display="block";
 });
-
-installBtn.onclick = async () => {
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
-  installBtn.style.display = "none";
+installBtn.onclick=async()=>{
+deferredPrompt.prompt();
+await deferredPrompt.userChoice;
+installBtn.style.display="none";
 };
 </script>
 
