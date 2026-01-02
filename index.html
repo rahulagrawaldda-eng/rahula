@@ -1,191 +1,279 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agrima Mart</title>
+<title>AGRIMA MART</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#25D366">
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
 
 <style>
-body{margin:0;font-family:Arial}
-header{background:#25D366;color:#fff;padding:12px;font-size:18px}
-#products{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:12px}
-.product{border:1px solid #ddd;border-radius:10px;padding:8px;cursor:pointer}
+body{margin:0;font-family:Arial;background:#fff}
+
+/* HEADER */
+#topHeader{
+background:#25D366;color:#fff;
+padding:10px 14px;
+display:flex;align-items:center;justify-content:space-between;
+position:sticky;top:0;z-index:20
+}
+.title{font-size:18px;font-weight:bold}
+.headerSocial{display:flex;gap:10px}
+.headerSocial img{width:26px;height:26px;border-radius:50%}
+
+/* SEARCH + CATEGORY */
+#search{width:94%;margin:10px auto;padding:10px;display:block}
+#categoryBar{display:flex;overflow-x:auto;padding:8px;background:#eee}
+#categoryBar button{
+margin-right:8px;border:none;border-radius:20px;
+padding:8px 14px;cursor:pointer
+}
+#categoryBar .active{background:#25D366;color:#fff}
+
+/* PRODUCTS */
+#products{display:grid;gap:12px;padding:12px}
+@media(max-width:600px){#products{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:601px){#products{grid-template-columns:repeat(5,1fr)}}
+
+.product{border:1px solid #ddd;border-radius:10px;padding:8px}
 .product img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px}
 .price{color:#2e7d32;font-weight:bold}
 
-#modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#0008}
+/* VARIANTS */
+.colors{display:flex;gap:8px;margin:6px 0}
+.color{
+width:22px;height:22px;border-radius:50%;
+border:2px solid #ccc;cursor:pointer
+}
+.color.active{border:3px solid #000}
+
+.sizes{display:flex;gap:6px;margin:6px 0;flex-wrap:wrap}
+.size{
+padding:4px 8px;border:1px solid #888;
+border-radius:6px;font-size:12px;cursor:pointer
+}
+.size.active{background:#25D366;color:#fff;border:none}
+
+/* CART FLOAT */
+#cartBtn{
+position:fixed;bottom:22px;right:22px;
+width:64px;height:64px;border-radius:50%;
+background:#25D366;color:#fff;
+display:flex;align-items:center;justify-content:center;
+font-size:26px;z-index:200
+}
+#cartCount{
+position:absolute;top:-6px;right:-6px;
+background:red;color:#fff;border-radius:50%;
+padding:4px 8px;font-size:13px
+}
+
+/* MODALS */
+#modal,#cartModal{
+display:none;position:fixed;top:0;left:0;
+width:100%;height:100%;
+background:rgba(0,0,0,.5);z-index:999
+}
 .modalBox{background:#fff;height:100%;overflow:auto;padding:14px}
 
+/* GALLERY */
 .gallery{display:flex;gap:10px;overflow-x:auto}
-.gallery img{width:100%;max-width:420px;border-radius:10px}
-
-.variant{margin:12px 0}
-.variantTitle{font-weight:600;margin-bottom:6px}
-
-.sizeBtn{
-  padding:6px 12px;border:1px solid #25D366;
-  background:#fff;border-radius:6px;margin-right:6px
+.gallery img{
+width:100%;max-width:420px;
+border-radius:10px;flex-shrink:0
 }
-.sizeBtn.active{background:#25D366;color:#fff}
-.sizeBtn.disabled{opacity:.4;pointer-events:none}
 
-.colorRow{display:flex;gap:10px}
-.colorDot{
-  width:26px;height:26px;border-radius:50%;
-  border:2px solid #ccc;cursor:pointer
-}
-.colorDot.active{border:3px solid #25D366}
-.colorDot.disabled{opacity:.3;pointer-events:none}
+/* CART */
+.cartItem{display:flex;gap:10px;border-bottom:1px solid #ddd;padding:8px 0}
+.cartItem img{width:50px;height:50px;border-radius:6px;object-fit:cover}
 </style>
 </head>
 
 <body>
 
-<header>Agrima Mart</header>
+<header id="topHeader">
+<span class="title">AGRIMA MART</span>
+<div class="headerSocial">
+<a href="https://wa.me/919929333794" target="_blank">
+<img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg">
+</a>
+<a href="https://instagram.com/agrima.mart" target="_blank">
+<img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png">
+</a>
+<a href="https://facebook.com/p/Agrima-Mart-61575460105163/" target="_blank">
+<img src="https://upload.wikimedia.org/wikipedia/commons/1/1b/Facebook_icon.svg">
+</a>
+</div>
+</header>
+
+<input id="search" placeholder="Search products...">
+<div id="categoryBar"></div>
 <div id="products"></div>
+
+<div id="cartBtn" onclick="openCart()">🛒<span id="cartCount">0</span></div>
 <div id="modal"></div>
+<div id="cartModal"></div>
 
 <script>
-const sheetURL="https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgUXWdE4/Sheet1";
 const phone="919929333794";
-
-let products=[];
-let selectedSize=null;
-let selectedColor=null;
-let currentProduct=null;
+const sheetURL="https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgUXWdE4/Sheet1";
 
 const productsDiv=document.getElementById("products");
-const modal=document.getElementById("modal");
+let products=[], cart=JSON.parse(localStorage.getItem("cart"))||{};
+let selectedVariant={}, currentCat="All Products";
 
-function parseStock(s){
-  let m={}; if(!s) return m;
-  s.split("|").forEach(x=>{
-    let [k,v]=x.split(":");
-    m[k]=+v;
-  });
-  return m;
-}
-
-function colorHex(c){
-  return {
-    blue:"#1e88e5",black:"#000",
-    red:"#e53935",green:"#43a047",
-    white:"#fff"
-  }[c.toLowerCase()] || "#999";
-}
-
+/* LOAD PRODUCTS */
 fetch(sheetURL).then(r=>r.json()).then(d=>{
 products=d.map(p=>({
-  name:p.name,
-  price:+p.offer||+p.mrp,
-  mrp:+p.mrp,
-  desc:p.description||"",
-  imgs:p.images.split("|"),
-  sizes:p.sizes?p.sizes.split("|"):[],
-  colors:p.colors?p.colors.split("|"):[],
-  stock:p.stock||""
+name:p.name,
+cat:p.category||"Others",
+price:+p.offer||+p.mrp,
+mrp:+p.mrp,
+desc:p.description||"",
+imgs:p.images.split("|"),
+colors:(p.colors||"").split("|").filter(Boolean),
+sizes:(p.sizes||"").split("|").filter(Boolean)
 }));
+renderCategories();
 renderProducts();
 });
 
+/* SEARCH */
+search.oninput=()=>renderProducts();
+
+/* CATEGORIES */
+function renderCategories(){
+let cats=["All Products",...new Set(products.map(p=>p.cat))];
+categoryBar.innerHTML=cats.map(c=>
+`<button class="${c===currentCat?'active':''}"
+onclick="currentCat='${c}';renderCategories();renderProducts()">${c}</button>`
+).join("");
+}
+
+/* PRODUCTS */
 function renderProducts(){
-productsDiv.innerHTML=products.map(p=>`
+let q=search.value.toLowerCase();
+productsDiv.innerHTML=products.filter(p=>{
+return (currentCat==="All Products"||p.cat===currentCat)
+&& p.name.toLowerCase().includes(q);
+}).map(p=>`
 <div class="product" onclick="openProduct('${p.name}')">
 <img src="${p.imgs[0]}">
 <h4>${p.name}</h4>
-<p class="price">₹${p.price}</p>
-</div>`).join("");
+<div class="price">₹${p.price}</div>
+
+<div class="colors" onclick="event.stopPropagation()">
+${p.colors.map(c=>`
+<div class="color" style="background:${c}"
+onclick="selectColor('${p.name}','${c}',this)"></div>`).join("")}
+</div>
+
+<div class="sizes" onclick="event.stopPropagation()">
+${p.sizes.map(s=>`
+<div class="size" onclick="selectSize('${p.name}','${s}',this)">${s}</div>`).join("")}
+</div>
+
+<button onclick="event.stopPropagation();addToCart('${p.name}')"
+style="width:100%;padding:8px">Add to Cart</button>
+</div>
+`).join("");
 }
 
+/* VARIANT SELECT */
+function selectColor(name,color,el){
+selectedVariant[name]=selectedVariant[name]||{};
+selectedVariant[name].color=color;
+el.parentNode.querySelectorAll('.color').forEach(x=>x.classList.remove('active'));
+el.classList.add('active');
+}
+function selectSize(name,size,el){
+selectedVariant[name]=selectedVariant[name]||{};
+selectedVariant[name].size=size;
+el.parentNode.querySelectorAll('.size').forEach(x=>x.classList.remove('active'));
+el.classList.add('active');
+}
+
+/* PRODUCT MODAL */
 function openProduct(name){
-const p=products.find(x=>x.name===name);
-currentProduct=name;
-selectedSize=null;
-selectedColor=null;
-
-const stock=parseStock(p.stock);
-
-let html=`
+let p=products.find(x=>x.name===name);
+modal.innerHTML=`
 <div class="modalBox">
-<button onclick="modal.style.display='none'">⬅ Back</button>
-
+<button onclick="history.back()">⬅ Back</button>
 <div class="gallery">
 ${p.imgs.map(i=>`<img src="${i}">`).join("")}
 </div>
-
 <h3>${p.name}</h3>
+<p class="price">₹${p.price}</p>
 <p>${p.desc}</p>
-`;
-
-if(p.sizes.length){
-html+=`
-<div class="variant">
-<div class="variantTitle">Size</div>
-${p.sizes.map(s=>{
-const disabled=p.colors.length
-? p.colors.every(c=>(stock[`${s}-${c}`]||0)<=0)
-: (stock[s]||0)<=0;
-return `<button class="sizeBtn ${disabled?'disabled':''}"
-onclick="selectSize('${s}')">${s}</button>`;
-}).join("")}
 </div>`;
-}
-
-if(p.colors.length){
-html+=`
-<div class="variant">
-<div class="variantTitle">Color</div>
-<div class="colorRow">
-${p.colors.map(c=>{
-const disabled=true;
-return `<div class="colorDot disabled"
-style="background:${colorHex(c)}"
-data-color="${c}"
-onclick="selectColor('${c}')"></div>`;
-}).join("")}
-</div>
-</div>`;
-}
-
-html+=`
-<button style="width:100%;padding:14px;background:#25D366;color:#fff;border:none;border-radius:6px"
-onclick="addToCart()">Add to Cart</button>
-</div>`;
-
-modal.innerHTML=html;
 modal.style.display="block";
+history.pushState({}, "");
 }
 
-function selectSize(s){
-selectedSize=s;
-document.querySelectorAll(".sizeBtn").forEach(b=>b.classList.remove("active"));
-event.target.classList.add("active");
-
-const p=products.find(x=>x.name===currentProduct);
-const stock=parseStock(p.stock);
-
-document.querySelectorAll(".colorDot").forEach(d=>{
-const c=d.dataset.color;
-const available=(stock[`${s}-${c}`]||0)>0;
-d.classList.toggle("disabled",!available);
-});
+/* CART */
+function addToCart(name){
+let v=selectedVariant[name];
+if(!v||!v.size||!v.color){
+alert("Please select size & color");
+return;
+}
+let key=`${name} | ${v.size} | ${v.color}`;
+cart[key]=(cart[key]||0)+1;
+localStorage.setItem("cart",JSON.stringify(cart));
+updateCount();
+}
+function updateCount(){
+cartCount.innerText=Object.values(cart).reduce((a,b)=>a+b,0);
 }
 
-function selectColor(c){
-if(event.target.classList.contains("disabled")) return;
-selectedColor=c;
-document.querySelectorAll(".colorDot").forEach(d=>d.classList.remove("active"));
-event.target.classList.add("active");
+/* CART MODAL */
+function openCart(){
+let total=0;
+cartModal.innerHTML=`
+<div class="modalBox">
+<button onclick="history.back()">⬅ Back</button>
+<h3>Your Cart</h3>
+${Object.keys(cart).map(k=>{
+let [name,size,color]=k.split(" | ");
+let p=products.find(x=>x.name===name);
+let t=p.price*cart[k]; total+=t;
+return `
+<div class="cartItem">
+<img src="${p.imgs[0]}">
+<div style="flex:1">
+<b>${name}</b><br>
+Size: ${size}, Color: ${color}<br>
+₹${p.price} × ${cart[k]}
+</div>
+<b>₹${t}</b>
+</div>`;
+}).join("")}
+<hr>
+<h3>Total ₹${total}</h3>
+<button onclick="checkout(${total})"
+style="width:100%;padding:12px;background:#25D366;color:#fff">
+Place Order on WhatsApp
+</button>
+</div>`;
+cartModal.style.display="block";
+history.pushState({}, "");
 }
 
-function addToCart(){
-const p=products.find(x=>x.name===currentProduct);
-if(p.sizes.length && !selectedSize){alert("Select size");return;}
-if(p.colors.length && !selectedColor){alert("Select color");return;}
-
-const text=`Hello Agrima Mart%0A${p.name} (${selectedSize||""}${selectedColor?", "+selectedColor:""})`;
-window.open(`https://wa.me/${phone}?text=${text}`,"_blank");
+/* CHECKOUT */
+function checkout(total){
+let msg="Hello Agrima Mart 👋%0A%0A";
+for(let k in cart){msg+=`• ${k} × ${cart[k]}%0A`;}
+msg+=`%0A💰 Total: ₹${total}`;
+window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
 }
+
+/* BACK BUTTON */
+window.onpopstate=()=>{
+modal.style.display="none";
+cartModal.style.display="none";
+};
 </script>
 
 </body>
