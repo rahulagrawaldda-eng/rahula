@@ -34,6 +34,14 @@ body{margin:0;font-family:Arial}
 #cartBtn{position:fixed;bottom:22px;right:22px;width:64px;height:64px;border-radius:50%;background:#25D366;color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;z-index:200}
 #cartCount{position:absolute;top:-6px;right:-6px;background:red;color:#fff;border-radius:50%;padding:4px 8px;font-size:13px}
 
+<button id="installBtn"
+style="position:fixed;bottom:100px;right:22px;
+padding:14px 18px;border-radius:30px;
+background:#000;color:#fff;border:none;
+display:none;z-index:300">
+📲 Install Agrima Mart
+</button>
+
 #modal,#cartModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999}
 .modalBox{background:#fff;height:100%;overflow:auto;padding:14px}
 
@@ -42,8 +50,11 @@ body{margin:0;font-family:Arial}
 
 .colors{display:flex;gap:8px;margin:10px 0}
 .color{width:24px;height:24px;border-radius:50%;border:2px solid #ccc}
-.color.active{border:3px solid #000}
-
+.color.active{
+  border:3px solid #000;
+  box-shadow:0 0 0 3px #25D366;
+  transform:scale(1.15);
+}
 .sizes{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
 .size{padding:6px 12px;border:1px solid #888;border-radius:6px}
 .size.active{background:#25D366;color:#fff;border:none}
@@ -335,6 +346,20 @@ setTimeout(()=>{toast.style.display="none";backCount=0},2000);
 }else{
 window.close();
 }
+};
+let deferredPrompt;
+const installBtn = document.getElementById("installBtn");
+
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = "block";
+});
+
+installBtn.onclick = async () => {
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  installBtn.style.display = "none";
 };
 </script>
 
