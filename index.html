@@ -10,15 +10,14 @@
 <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
 
 <style>
-body{margin:0;font-family:Arial;background:#fff}
-#topHeader{background:#25D366;color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:20}
-.title{font-size:18px;font-weight:bold}
+body{margin:0;font-family:Arial}
+#topHeader{background:#25D366;color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
 .headerSocial{display:flex;gap:10px}
-.headerSocial img{width:26px;height:26px;border-radius:50%}
+.headerSocial img{width:26px;height:26px}
 
 #search{width:94%;margin:10px auto;padding:10px;display:block}
-#categoryBar{display:flex;overflow-x:auto;padding:8px;background:#eee}
-#categoryBar button{margin-right:8px;border:none;border-radius:20px;padding:8px 14px}
+#categoryBar{display:flex;gap:8px;overflow-x:auto;padding:8px;background:#eee}
+#categoryBar button{border:none;border-radius:20px;padding:8px 14px}
 #categoryBar .active{background:#25D366;color:#fff}
 
 #products{display:grid;gap:12px;padding:12px}
@@ -27,20 +26,24 @@ body{margin:0;font-family:Arial;background:#fff}
 
 .product{border:1px solid #ddd;border-radius:10px;padding:8px}
 .product img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px}
-.price{color:#2e7d32;font-weight:bold}
 
-.qty{display:flex;gap:12px;justify-content:center;margin-top:6px}
+.price{color:#2e7d32;font-weight:bold}
+.qty{display:flex;justify-content:center;gap:12px;margin-top:6px}
 .qty button{padding:6px 14px;border:none;background:#25D366;color:#fff;border-radius:6px}
 
-#cartBtn{position:fixed;bottom:22px;right:22px;width:64px;height:64px;border-radius:50%;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;z-index:200}
+#cartBtn{position:fixed;bottom:22px;right:22px;width:64px;height:64px;border-radius:50%;background:#25D366;color:#fff;font-size:26px;display:flex;align-items:center;justify-content:center;z-index:200}
 #cartCount{position:absolute;top:-6px;right:-6px;background:red;color:#fff;border-radius:50%;padding:4px 8px;font-size:13px}
 
-#modal,#cartModal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999}
+#modal,#cartModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999}
 .modalBox{background:#fff;height:100%;overflow:auto;padding:14px}
+
+.gallery{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory}
+.gallery img{width:90vw;max-width:420px;object-fit:contain;flex-shrink:0;scroll-snap-align:center;background:#f5f5f5;border-radius:10px}
 
 .colors{display:flex;gap:8px;margin:10px 0}
 .color{width:24px;height:24px;border-radius:50%;border:2px solid #ccc}
 .color.active{border:3px solid #000}
+
 .sizes{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
 .size{padding:6px 12px;border:1px solid #888;border-radius:6px}
 .size.active{background:#25D366;color:#fff;border:none}
@@ -49,14 +52,14 @@ body{margin:0;font-family:Arial;background:#fff}
 .cartItem img{width:50px;height:50px;border-radius:6px}
 
 #installBtn{position:fixed;bottom:100px;right:22px;padding:14px 18px;border-radius:30px;background:#000;color:#fff;border:none;display:none;z-index:300}
-#toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 18px;border-radius:20px;display:none;z-index:9999}
+#toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 18px;border-radius:20px;display:none}
 </style>
 </head>
 
 <body>
 
 <header id="topHeader">
-<span class="title">AGRIMA MART</span>
+<b>AGRIMA MART</b>
 <div class="headerSocial">
 <a href="https://wa.me/919929333794"><img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"></a>
 <a href="https://instagram.com/agrima.mart"><img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png"></a>
@@ -79,63 +82,55 @@ body{margin:0;font-family:Arial;background:#fff}
 const phone="919929333794";
 const sheetURL="https://opensheet.elk.sh/1DLJoLnM_GcB_a1uYDOk1YaFX3KTHEXCAF4gxgUXWdE4/Sheet1";
 
-const productsDiv=document.getElementById("products"); // ✅ FIX
-const modal=document.getElementById("modal");
-const cartModal=document.getElementById("cartModal");
-
+const productsDiv=document.getElementById("products");
 let products=[],cart=JSON.parse(localStorage.getItem("cart"))||{};
-let currentCat="All Products",frozen=false,modalOpen=false,cartOpen=false;
-let selectedVariant={},backCount=0;
+let currentCat="All Products",selectedVariant={},backCount=0;
+let modalOpen=false,cartOpen=false,frozen=false;
 
-/* FROZEN CART */
+/* SNAPSHOT */
 const qs=new URLSearchParams(location.search);
 if(qs.get("o")){
 cart=JSON.parse(LZString.decompressFromEncodedURIComponent(qs.get("o")));
 frozen=true;
 }
 
+/* LOAD */
 fetch(sheetURL).then(r=>r.json()).then(d=>{
 products=d.map(p=>({
 name:p.name,
 cat:p.category||"Others",
 price:+p.offer||+p.mrp,
-mrp:+p.mrp,
 desc:p.description||"",
 imgs:p.images.split("|"),
 colors:(p.colors||"").split("|").filter(Boolean),
 sizes:(p.sizes||"").split("|").filter(Boolean)
 }));
-renderCategories();
-renderProducts();
+renderCategories();renderProducts();
 if(frozen) setTimeout(openCart,300);
 });
 
 search.oninput=()=>renderProducts();
 
 /* SMART SEARCH */
-function smartMatch(p){
-let keys=search.value.toLowerCase().trim().split(/\s+/);
-let text=(p.name+" "+p.cat).toLowerCase();
-return keys.every(k=>text.includes(k));
+function match(p){
+return search.value.toLowerCase().split(/\s+/).every(k=>
+(p.name+p.cat).toLowerCase().includes(k));
 }
 
-/* CATEGORIES */
+/* CATEGORY */
 function renderCategories(){
 let cats=["All Products",...new Set(products.map(p=>p.cat))];
-categoryBar.innerHTML=cats.map(c=>
-`<button class="${c===currentCat?'active':''}"
-onclick="currentCat='${c}';renderCategories();renderProducts()">${c}</button>`
-).join("");
+categoryBar.innerHTML=cats.map(c=>`<button class="${c===currentCat?'active':''}"
+onclick="currentCat='${c}';renderCategories();renderProducts()">${c}</button>`).join("");
 }
 
 /* PRODUCTS */
 function renderProducts(){
 productsDiv.innerHTML=products.filter(p=>
-(currentCat==="All Products"||p.cat===currentCat)&&smartMatch(p)
+(currentCat==="All Products"||p.cat===currentCat)&&match(p)
 ).map(p=>{
 let qty=Object.keys(cart).filter(k=>k.startsWith(p.name)).reduce((a,k)=>a+cart[k],0);
-return `
-<div class="product" onclick="openProduct('${p.name}')">
+return `<div class="product" onclick="openProduct('${p.name}')">
 <img src="${p.imgs[0]}">
 <h4>${p.name}</h4>
 <p class="price">₹${p.price}</p>
@@ -143,98 +138,78 @@ return `
 <button onclick="updateCart('${p.name}',-1)">−</button>
 <span>${qty}</span>
 <button onclick="updateCart('${p.name}',1)">+</button>
-</div>
-</div>`;
+</div></div>`;
 }).join("");
 updateCount();
 }
 
-/* PRODUCT MODAL */
+/* PRODUCT */
 function openProduct(name){
+backCount=0;
 let p=products.find(x=>x.name===name);
 selectedVariant[name]={};
-
-modal.innerHTML=`
-<div class="modalBox">
+modal.innerHTML=`<div class="modalBox">
 <button onclick="history.back()">⬅ Back</button>
-
-<div class="gallery">
-${p.imgs.map(i=>`<img src="${i}" loading="lazy">`).join("")}
-</div>
-
-<h3>${p.name}</h3>
-<p class="price">₹${p.price}</p>
-<p>${p.desc}</p>
-
-${p.colors.length?`
-<div class="colors">
-${p.colors.map(c=>`
-<div class="color" style="background:${c}"
-onclick="selectColor('${name}','${c}',this)"></div>`).join("")}
-</div>`:""}
-
-${p.sizes.length?`
-<div class="sizes">
-${p.sizes.map(s=>`
-<div class="size" onclick="selectSize('${name}','${s}',this)">${s}</div>`).join("")}
-</div>`:""}
-
+<div class="gallery">${p.imgs.map(i=>`<img src="${i}">`).join("")}</div>
+<h3>${p.name}</h3><p>${p.desc}</p>
+${p.colors.length?`<div class="colors">${p.colors.map(c=>`<div class="color" style="background:${c}" onclick="selectColor('${name}','${c}',this)"></div>`).join("")}</div>`:""}
+${p.sizes.length?`<div class="sizes">${p.sizes.map(s=>`<div class="size" onclick="selectSize('${name}','${s}',this)">${s}</div>`).join("")}</div>`:""}
 <div class="qty">
 <button onclick="updateCart('${name}',-1,true)">−</button>
 <span>${getQty(name)}</span>
 <button onclick="updateCart('${name}',1,true)">+</button>
-</div>
-
-</div>`;
-modal.style.display="block";
-modalOpen=true;
-history.pushState({}, "");
+</div></div>`;
+modal.style.display="block";modalOpen=true;history.pushState({}, "");
 }
 
+/* VARIANTS */
 function selectColor(n,c,e){selectedVariant[n].color=c;e.parentNode.querySelectorAll('.color').forEach(x=>x.classList.remove('active'));e.classList.add('active')}
 function selectSize(n,s,e){selectedVariant[n].size=s;e.parentNode.querySelectorAll('.size').forEach(x=>x.classList.remove('active'));e.classList.add('active')}
-
 function getQty(n){return Object.keys(cart).filter(k=>k.startsWith(n)).reduce((a,k)=>a+cart[k],0)}
 
+/* CART */
 function updateCart(name,v,stay){
-if(frozen) return;
+if(frozen){alert("This is a shared cart snapshot");return;}
 let p=products.find(x=>x.name===name);
 let key=name;
 if(p.colors.length||p.sizes.length){
 let sv=selectedVariant[name];
-if(p.colors.length&&!sv.color) return alert("Select color");
-if(p.sizes.length&&!sv.size) return alert("Select size");
+if(p.colors.length&&!sv.color)return alert("Select color");
+if(p.sizes.length&&!sv.size)return alert("Select size");
 key=`${name} | ${sv.size||""} | ${sv.color||""}`;
 }
 cart[key]=(cart[key]||0)+v;
 if(cart[key]<=0) delete cart[key];
 localStorage.setItem("cart",JSON.stringify(cart));
-renderProducts();
-if(stay) openProduct(name);
-if(cartOpen) renderCart();
+renderProducts();if(stay)openProduct(name);if(cartOpen)renderCart();
 }
 
-function openCart(){renderCart();cartModal.style.display="block";cartOpen=true;history.pushState({}, "")}
+function updateCartKey(key,v){
+if(frozen)return;
+cart[key]+=v;
+if(cart[key]<=0) delete cart[key];
+localStorage.setItem("cart",JSON.stringify(cart));
+renderProducts();renderCart();
+}
+
+function openCart(){backCount=0;renderCart();cartModal.style.display="block";cartOpen=true;history.pushState({}, "")}
 
 function renderCart(){
 let total=0;
-cartModal.innerHTML=`
-<div class="modalBox">
+cartModal.innerHTML=`<div class="modalBox">
 <button onclick="history.back()">⬅ Back</button>
 ${Object.keys(cart).map(k=>{
-let [n]=k.split(" | ");
-let p=products.find(x=>x.name===n);
-let t=p.price*cart[k]; total+=t;
+let [n]=k.split(" | ");let p=products.find(x=>x.name===n);
+let t=p.price*cart[k];total+=t;
 return `<div class="cartItem">
 <img src="${p.imgs[0]}">
-<div><b>${k}</b>
+<div style="flex:1"><b>${k}</b>
+<div>${cart[k]} × ₹${p.price} = ₹${t}</div>
 <div class="qty">
-<button onclick="updateCart('${n}',-1)">−</button>
+<button onclick="updateCartKey('${k}',-1)">−</button>
 <span>${cart[k]}</span>
-<button onclick="updateCart('${n}',1)">+</button>
-</div></div>
-<b>₹${t}</b>
-</div>`;
+<button onclick="updateCartKey('${k}',1)">+</button>
+</div></div><b>₹${t}</b></div>`;
 }).join("")}
 <h3>Total ₹${total}</h3>
 <button onclick="checkout()" style="width:100%;padding:14px;background:#25D366;color:#fff;border:none">Place Order</button>
@@ -244,36 +219,31 @@ return `<div class="cartItem">
 function updateCount(){cartCount.innerText=Object.values(cart).reduce((a,b)=>a+b,0)}
 
 function checkout(){
-const comp=LZString.compressToEncodedURIComponent(JSON.stringify(cart));
-let msg="Order%0A";
-let total=0;
+let comp=LZString.compressToEncodedURIComponent(JSON.stringify(cart));
+let msg="Order%0A";let total=0;
 for(let k in cart){
-let [n]=k.split(" | ");
-let p=products.find(x=>x.name===n);
-let t=p.price*cart[k];
-total+=t;
+let [n]=k.split(" | ");let p=products.find(x=>x.name===n);
+let t=p.price*cart[k];total+=t;
 msg+=`${k} × ${cart[k]} = ₹${t}%0A`;
 }
 msg+=`%0ATotal ₹${total}%0A${location.origin}${location.pathname}?o=${comp}`;
 window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
 }
 
-function showToast(t){toast.innerText=t;toast.style.display="block";setTimeout(()=>toast.style.display="none",2000)}
-
+/* BACK */
 window.onpopstate=()=>{
 if(modalOpen){modal.style.display="none";modalOpen=false;return;}
 if(cartOpen){cartModal.style.display="none";cartOpen=false;return;}
 if(search.value){search.value="";renderProducts();return;}
 backCount++;
-if(backCount===1){showToast("Press back again to exit");setTimeout(()=>backCount=0,2000)}
-else{window.close()}
-}
+if(backCount===1){toast.innerText="Press back again to exit";toast.style.display="block";setTimeout(()=>{toast.style.display="none";backCount=0},2000)}
+else window.close();
+};
 
 /* INSTALL */
 let deferredPrompt;
 window.addEventListener("beforeinstallprompt",e=>{
-e.preventDefault();deferredPrompt=e;
-installBtn.style.display="block";
+e.preventDefault();deferredPrompt=e;installBtn.style.display="block";
 });
 installBtn.onclick=async()=>{
 deferredPrompt.prompt();
@@ -281,6 +251,5 @@ await deferredPrompt.userChoice;
 installBtn.style.display="none";
 };
 </script>
-
 </body>
 </html>
